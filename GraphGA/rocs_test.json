@@ -1,0 +1,36 @@
+{
+  "task": "rocs_test",
+  "output_dir": "./",
+  "load_from_previous": false,
+  "logging": false,
+  "monitor_app": false,
+  "budget": 1000,
+  "termination_exit": false,
+  "scoring_functions": [
+    {
+      "name": "ROCS",
+      "run": true,
+      "parameters": {
+        "prefix": "",
+        "ref_file": "target.smi"
+      }
+    }
+  ],
+  "scoring": {
+    "metrics": [
+      {
+        "name": "valid_score",
+        "filter": false,
+        "weight": 1.0,
+        "modifier": "raw",
+        "parameters": {}
+      }
+    ],
+    "method": "single"
+  },
+  "diversity_filter": {
+    "run": true,
+    "name": "Unique",
+    "parameters": {}
+  }
+}

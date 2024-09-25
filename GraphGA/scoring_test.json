@@ -1,0 +1,40 @@
+{
+  "task": "scoring_test",
+  "output_dir": "./",
+  "load_from_previous": false,
+  "logging": false,
+  "monitor_app": false,
+  "budget": 1000,
+  "termination_exit": false,
+  "scoring_functions": [
+    {
+      "name": "MolecularSimilarity",
+      "run": true,
+      "parameters": {
+        "prefix": "",
+        "ref_smiles": "/Users/marcellocostamagna/MolScore/MolScore_examples/GraphGA/target.smi",
+        "fp": "ECFP4",
+        "bits": 1024,
+        "similarity_measure": "Tanimoto",
+        "method": "mean",
+        "n_jobs": 1,
+        "timeout": 60
+      }
+    }
+  ],
+  "scoring": {
+    "metrics": [
+      {
+        "name": "valid_score",
+        "filter": false,
+        "weight": 1.0,
+        "modifier": "raw",
+        "parameters": {}
+      }
+    ],
+    "method": "single"
+  },
+  "diversity_filter": {
+    "run": false
+  }
+}

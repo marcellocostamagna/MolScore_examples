@@ -12,4 +12,4 @@ After cloning this repo, setup the python environment with your favorite environ
 
 I have modified the main script to include molscore scoring functions. This is a minimal working version to run configs or benchmarks.
 
-    python molscore_GB_GA.py --molscore <path_to_config|name_of_benchmark|dir_of_configs>
+    python molscore_GB_GA.py --molscore <path_to_config|name _of_benchmark|dir_of_configs>
