@@ -220,7 +220,7 @@ class SMILES_GA:
                   f'{mol_sec:.2f} mol/sec')
 
         # Return final population
-        return [molecule.smiles for molecule in population[:number_molecules]]
+        return [(molecule.smiles, molecule.score) for molecule in population]
 
 
 def main(args):
@@ -246,7 +246,8 @@ def main(args):
         final_population_smiles = generator.generate_optimized_molecules(scoring_function=scoring_function, number_molecules=args.population_size)
 
     with open(os.path.join(scoring_function.save_dir, 'final_population.smi'), 'w') as f:
-        [f.write(smi + '\n') for smi in final_population_smiles]
+        for smi, score in final_population_smiles:
+            f.write(f'{smi}\t{score}\n')
 
 
 def get_args():

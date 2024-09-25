@@ -93,12 +93,16 @@ def mutate(p_gene, scoring_function):
         # Decode the mutated gene into SMILES directly without RDKit canonicalization
         # (Devation from original Guacamol code)
         c_smiles = decode(gene_to_cfg(c_gene))
-        
+    except Exception as e:
+        # Handle any decoding errors gracefully
+        print(f'Error during mutation: {e}')
+    try: 
         # Score the mutated SMILES using the scoring function
+        print(f'Scoring: {c_smiles}')
         c_score = scoring_function(c_smiles)
     except Exception as e:
-        # Handle any decoding or scoring errors gracefully
-        print(f'Error during mutation or scoring: {e}')
+        # Handle any scoring errors gracefully
+        print(f'Error during scoring: {e}')
         c_smiles = ''
         c_score = 0.0
         
@@ -157,7 +161,12 @@ class SMILES_GA:
         starting_population = [smiles for smiles in starting_population if '%' not in smiles]
 
         # Calculate initial genes
-        initial_genes = [cfg_to_gene(encode(s), max_len=self.gene_size) for s in starting_population]
+        # initial_genes = [cfg_to_gene(encode(s), max_len=self.gene_size) for s in starting_population]
+              
+        # Deviation from original Guacamol code: handle the possibility of invalid encoded SMILES (None)         
+        initial_genes = [cfg_to_gene(encoded, max_len=self.gene_size) 
+                 for s in starting_population 
+                 if (encoded := encode(s)) is not None]
 
         # Score initial population
         initial_scores = scoring_function(starting_population, flt=True, score_only=True)
