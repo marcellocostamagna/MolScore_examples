@@ -12,7 +12,7 @@
       "parameters": {
         "prefix": "hsrP",
         "ref_molecule": "/Users/marcellocostamagna/MolScore/MolScore_examples/RANDOM_sampler/Organic/target.sdf",
-        "generator": "obabel",
+        "generator": "ccdc",
         "n_jobs": 1
       }
     }

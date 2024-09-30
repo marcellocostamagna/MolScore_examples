@@ -26,7 +26,8 @@ class RandomSmilesSampler:
         Returns:
             A list of sampled SMILES strings.
         """
-        return list(np.random.choice(self.molecules, size=number_samples, replace=False))
+        # return list(np.random.choice(self.molecules, size=number_samples, replace=False)) #(Return type: List[numpy.str_])
+        return [str(smile) for smile in np.random.choice(self.molecules, size=number_samples, replace=False)] #(Return type: List[str])
 
 
 def main(args):
@@ -76,5 +77,6 @@ def get_args():
 
 
 if __name__ == "__main__":
+    
     args = get_args()
     main(args)
