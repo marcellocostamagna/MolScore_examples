@@ -159,7 +159,10 @@ class GB_GA:
             t0 = time()
 
             old_scores = population_scores
-            population_scores = scoring_function([Chem.MolToSmiles(s) for s in population_mol],
+            # population_scores = scoring_function([Chem.MolToSmiles(s) for s in population_mol],
+            #                                      step=generation,
+            #                                      flt=True)
+            population_scores = scoring_function(population_mol,
                                                  step=generation,
                                                  flt=True)
             population_tuples = list(zip(population_scores, population_mol))
@@ -227,8 +230,8 @@ def get_args():
 
     optional = parser.add_argument_group('Optional')
     optional.add_argument('--seed', type=int, default=0, help=' ')
-    optional.add_argument('--population_size', type=int, default=50, help=' ')
-    optional.add_argument('--offspring_size', type=int, default=20, help=' ')
+    optional.add_argument('--population_size', type=int, default=20, help=' ')
+    optional.add_argument('--offspring_size', type=int, default=10, help=' ')
     optional.add_argument('--mutation_rate', type=float, default=0.01, help=' ')
     optional.add_argument('--generations', type=int, default=5, help=' ')
     optional.add_argument('--n_jobs', type=int, default=-1, help=' ')

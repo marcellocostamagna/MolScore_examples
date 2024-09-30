@@ -103,7 +103,7 @@ def mutate(p_gene, scoring_function):
     except Exception as e:
         # Handle any scoring errors gracefully
         print(f'Error during scoring: {e}')
-        c_smiles = ''
+        c_smiles = 0.0
         c_score = 0.0
         
     return Molecule(c_score, c_smiles, c_gene)
