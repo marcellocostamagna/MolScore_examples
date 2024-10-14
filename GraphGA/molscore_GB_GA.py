@@ -107,13 +107,13 @@ class GB_GA:
             return None
 
     def top_k(self, smiles, scoring_function, k):
-        mols = [Chem.MolFromSmiles(s) for s in smiles]
-        # scores = scoring_function(smiles, flt=True, score_only=True)
-        scores = scoring_function(mols, flt=True, score_only=True)
+        # mols = [Chem.MolFromSmiles(s) for s in smiles]
+        scores = scoring_function(smiles, flt=True, score_only=True)
+        # scores = scoring_function(mols, flt=True, score_only=True)
         # joblist = (delayed(scoring_function.score)(s) for s in smiles)
         # scores = self.pool(joblist)
-        # scored_smiles = list(zip(scores, smiles))
-        scored_smiles = list(zip(scores, mols))
+        scored_smiles = list(zip(scores, smiles))
+        # scored_smiles = list(zip(scores, mols))
         scored_smiles = sorted(scored_smiles, key=lambda x: x[0], reverse=True)
         return [smile for score, smile in scored_smiles][:k]
 
@@ -136,10 +136,10 @@ class GB_GA:
         population_scores = []
         for score, smi in sorted(zip(starting_population_scores, starting_population),
                                  key=lambda x: x[0], reverse=True)[:self.population_size]:
-            # population_smiles.append(smi)
-            population_mol.append(smi)
-            # population_mol.append(Chem.MolFromSmiles(smi))
-            population_smiles.append(Chem.MolToSmiles(smi))
+            population_smiles.append(smi)
+            # population_mol.append(smi)
+            population_mol.append(Chem.MolFromSmiles(smi))
+            # population_smiles.append(Chem.MolToSmiles(smi))
             population_scores.append(score)
 
         # evolution: go go go!!
@@ -165,14 +165,14 @@ class GB_GA:
 
             old_scores = population_scores
             # Original code (smiles)
-            # population_scores = scoring_function([Chem.MolToSmiles(s) for s in population_mol],
-            #                                      step=generation,
-            #                                      flt=True)
-            
-            # New code (rdkit molecules)
-            population_scores = scoring_function(population_mol,
+            population_scores = scoring_function([Chem.MolToSmiles(s) for s in population_mol],
                                                  step=generation,
                                                  flt=True)
+            
+            # New code (rdkit molecules)
+            # population_scores = scoring_function(population_mol,
+            #                                      step=generation,
+            #                                      flt=True)
             
             population_tuples = list(zip(population_scores, population_mol))
             population_tuples = sorted(population_tuples, key=lambda x: x[0], reverse=True)[:self.population_size]
@@ -242,7 +242,7 @@ def get_args():
     optional.add_argument('--population_size', type=int, default=20, help=' ')
     optional.add_argument('--offspring_size', type=int, default=10, help=' ')
     optional.add_argument('--mutation_rate', type=float, default=0.01, help=' ')
-    optional.add_argument('--generations', type=int, default=5, help=' ')
+    optional.add_argument('--generations', type=int, default=20, help=' ')
     optional.add_argument('--n_jobs', type=int, default=-1, help=' ')
     optional.add_argument('--random_start', action='store_true')
     optional.add_argument('--patience', type=int, default=5, help=' ')
