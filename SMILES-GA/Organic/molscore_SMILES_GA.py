@@ -94,14 +94,20 @@ def mutate(p_gene, scoring_function):
         # (Devation from original Guacamol code)
         c_smiles = decode(gene_to_cfg(c_gene))
         
-        # Score the mutated SMILES using the scoring function
-        c_score = scoring_function(c_smiles)
     except Exception as e:
-        # Handle any decoding or scoring errors gracefully
-        print(f'Error during mutation or scoring: {e}')
+        # Handle any decoding errors gracefully
+        print(f'The mutation resulted in an invalid molecule: {e}')
         c_smiles = ''
         c_score = 0.0
         
+    try:
+        c_score = scoring_function(c_smiles)
+    except Exception as e:
+        # Handle any scoring errors gracefully
+        print(f'The scoring of the mutated molecule failed: {e}')
+        print(f'SMILES: {c_smiles}')
+        c_score = 0.0
+         
     return Molecule(c_score, c_smiles, c_gene)
 
 
@@ -170,6 +176,11 @@ class SMILES_GA:
         patience = 0
 
         for generation in range(self.generations):
+            
+            # print the population
+            print(f'Generation {generation}:')
+            for molecule in population:
+                print(f'{molecule.smiles} --> {molecule.score}')
 
             old_scores = population_scores
             all_genes = [molecule.genes for molecule in population]
@@ -181,10 +192,16 @@ class SMILES_GA:
             # new_population = self.pool(joblist)
             # Deviation from original Guacamol code: directly mutate genes and score SMILES
             new_population = [mutate(g, scoring_function) for g in genes_to_mutate]
+            
+            print(f'Generated {len(new_population)} new molecules')
+    
 
             # Deduplicate
             population += new_population
             population = deduplicate(population)
+            
+            # print the size of the population
+            print(f'Population size after deduplication: {len(population)}')            
             
             # Deviation from original Guacamol code: use MolScore to score the population
             population_smiles = [molecule.smiles for molecule in population]
@@ -258,9 +275,9 @@ def get_args():
     # Optional arguments for GA setup
     optional = parser.add_argument_group('Optional')
     optional.add_argument('--seed', type=int, default=42, help='Random seed')
-    optional.add_argument('--population_size', type=int, default=50, help='Population size')
-    optional.add_argument('--n_mutations', type=int, default=20, help='Number of mutations per generation')
-    optional.add_argument('--gene_size', type=int, default=30, help='Gene size for the CFG-based encoding')
+    optional.add_argument('--population_size', type=int, default=10, help='Population size')
+    optional.add_argument('--n_mutations', type=int, default=10, help='Number of mutations per generation')
+    optional.add_argument('--gene_size', type=int, default=-1, help='Gene size for the CFG-based encoding')
     optional.add_argument('--generations', type=int, default=5, help='Number of generations')
     optional.add_argument('--n_jobs', type=int, default=-1, help='Number of parallel jobs')
     optional.add_argument('--random_start', action='store_true', help='Start with a random population')
