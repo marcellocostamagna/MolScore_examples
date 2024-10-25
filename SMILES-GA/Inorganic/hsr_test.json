@@ -11,8 +11,8 @@
       "run": true,
       "parameters": {
         "prefix": "hsrP",
-        "ref_molecule": "/Users/marcellocostamagna/MolScore/MolScore_examples/GraphGA/target.sdf",
-        "generator": "obabel",
+        "ref_molecule": "/Users/marcellocostamagna/MolScore/MolScore_examples/SMILES-GA/Inorganic/target.sdf",
+        "generator": "ccdc",
         "n_jobs": 1
       }
     }
