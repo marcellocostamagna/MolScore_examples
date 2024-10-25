@@ -24,7 +24,7 @@ from molscore.utils.smiles_grammar import GCFG
 from collections import namedtuple
 from molscore.utils.cfg_util import encode, decode
 
-Molecule = namedtuple('Molecule', ['score', 'smiles', 'genes'])
+Molecule = namedtuple('Molecule', ['score', 'smiles', 'gene'])
 
 def cfg_to_gene(prod_rules, max_len=-1):
     gene = []
@@ -76,7 +76,7 @@ def mutation(gene):
     return gene_mutant
 
 
-def deduplicate(population):
+def remove_duplicates(population):
     unique_smiles = set()
     unique_population = []
     for item in population:
@@ -111,7 +111,7 @@ def mutate(p_gene, scoring_function):
     return Molecule(c_score, c_smiles, c_gene)
 
 def mutate_no_score(p_gene):
-    #TODO: In case the muatation produces an invalid molecules we could 
+    #TODO: In case the mutation produces an invalid molecules we could 
     # attempt to mutate again until a valid molecule is produced or a 
     # maximum number of attempts is reached
     c_gene = mutation(p_gene)
@@ -163,32 +163,72 @@ class SMILES_GA:
         # return [smile for score, smile in scored_smiles][:k]
 
     def generate_optimized_molecules(self, scoring_function, number_molecules: int,
-                                     starting_population: Optional[List[str]] = None) -> List[str]:
+                                     starting_population: Optional[List[str]] = None,
+                                     use_cache: bool = False) -> List[str]:
+
+        # NEW CODE
+        # Initialize a cache for already scored molecules if caching is enabled
+        score_cache = {} if use_cache else None
+        
         if number_molecules > self.population_size:
             self.population_size = number_molecules
             print(f'Benchmark requested more molecules than expected: new population is {number_molecules}')
 
+        # NEW CODE
         # fetch initial population
-        if starting_population is None:
-            print('Selecting initial population...')
-            init_size = self.population_size + self.n_mutations
-            all_smiles = copy.deepcopy(self.all_smiles)
-            if self.random_start:
-                starting_population = np.random.choice(all_smiles, init_size)
-            else:
-                starting_population = self.top_k(all_smiles, scoring_function, init_size)
+        # Get the first 'population_size' SMILES from the list of all SMILES
+        # The population size will ultimately be 100, but we will start with 20
+        starting_population = self.all_smiles[:self.population_size]
+        
+         # ORIGINAL CODE
+        # # fetch initial population
+        # if starting_population is None:
+        #     print('Selecting initial population...')
+        #     init_size = self.population_size + self.n_mutations
+        #     all_smiles = copy.deepcopy(self.all_smiles)
+        #     if self.random_start:
+        #         starting_population = np.random.choice(all_smiles, init_size)
+        #     else:
+        #         starting_population = self.top_k(all_smiles, scoring_function, init_size)
+        
+        
+        # # ORIGINAL CODE
+        # # Calculate initial genes
+        # initial_genes = [cfg_to_gene(encode(s), max_len=self.gene_size) for s in starting_population]
+        
+        # NEW CODE
+        # Calculate initial genes with multiprocessing
+        joblist = (delayed(cfg_to_gene)(encode(s), max_len=self.gene_size) for s in starting_population)
+        initial_genes = self.pool(joblist)
+        # Score initial population, using cache if enabled
+        population_smiles = [s for s in starting_population]
+        updated_genes = [g for g in initial_genes]        
 
-        # Exclude SMILES with '%' (ring structures not handled well)
-        starting_population = [smiles for smiles in starting_population if '%' not in smiles]
+        # NEW CODE
+        # Separate SMILES that need scoring from those already scored, if cache is used
+        if use_cache:
+            new_smiles = [smiles for smiles in population_smiles if smiles not in score_cache]
+            new_scores = scoring_function(new_smiles, flt=True, score_only=True)
+            # Update the score cache with newly scored SMILES
+            score_cache.update({smiles: (score, gene) for smiles, score, gene in zip(new_smiles, new_scores, updated_genes)})
+            # Retrieve all scores from the cache
+            population_scores = [score_cache[smiles][0] for smiles in population_smiles]
+        else:
+            # Directly score all SMILES if no cache is used
+            population_scores = scoring_function(population_smiles, flt=True, score_only=True)
 
-        # Calculate initial genes
-        initial_genes = [cfg_to_gene(encode(s), max_len=self.gene_size) for s in starting_population]
-
+        # ORIGINAL CODE
         # Score initial population
-        initial_scores = scoring_function(starting_population, flt=True, score_only=True)
-        population = [Molecule(*m) for m in zip(initial_scores, starting_population, initial_genes)]
+        # initial_scores = scoring_function(starting_population, flt=True, score_only=True)
+        # population = [Molecule(*m) for m in zip(initial_scores, starting_population, initial_genes)]
+        # population = sorted(population, key=lambda x: x.score, reverse=True)[:self.population_size]
+        # population_scores = [p.score for p in population]
+        
+        # NEW CODE
+        # Initialize the population with scores and genes
+        population = [Molecule(score, smiles, gene) for score, smiles, gene in zip(population_scores, population_smiles, updated_genes)]
         population = sorted(population, key=lambda x: x.score, reverse=True)[:self.population_size]
-        population_scores = [p.score for p in population]
+        
 
         # Evolution process
         t0 = time()
@@ -196,27 +236,29 @@ class SMILES_GA:
 
         for generation in range(self.generations):
             
-            # print the population
+            # NEW CODE
+            # print the population (This is for DEBUGGING purposes)
             print(f'Generation {generation}:')
             for molecule in population:
                 print(f'{molecule.smiles} --> {molecule.score}')
 
-            old_scores = population_scores
+            # Track scores to check for early stopping
+            old_scores = [molecule.score for molecule in population]
             all_genes = [molecule.genes for molecule in population]
-            choice_indices = np.random.choice(len(all_genes), self.n_mutations, replace=True)
+            choice_indices = np.random.choice(len(all_genes), self.n_mutations, replace=False)
             genes_to_mutate = [all_genes[i] for i in choice_indices]
 
             # Evolve genes
             # Mutation using multiprocessing
             joblist = (delayed(mutate_no_score)(g) for g in genes_to_mutate)
-            mutated_molecules = self.pool(joblist)
+            mutated_genes = self.pool(joblist)
             
             print('Number of genes to mutate:', len(genes_to_mutate))
-            print('Number of mutated molecules:', len(mutated_molecules))
-            if len(genes_to_mutate) > 0:
-                print(f'Effective mutation rate: {len(mutated_molecules) / len(genes_to_mutate) * 100:.2f} %')
-            else:
-                print('No genes available for mutation.')
+            print('Number of mutated genes:', len(mutated_genes))
+            # if len(genes_to_mutate) > 0:
+            #     print(f'Effective mutation rate: {len(mutated_molecules) / len(genes_to_mutate) * 100:.2f} %')
+            # else:
+            #     print('No genes available for mutation.')
             
             # # Deviation from original Guacamol code: directly mutate genes and score SMILES
             # new_population = [mutate(g, scoring_function) for g in genes_to_mutate]
@@ -225,20 +267,31 @@ class SMILES_GA:
             # print(f'Generated {len(new_population)} new molecules')
     
             # Deduplicate
-            population += mutated_molecules
-            population = deduplicate(population)
+            population += mutated_genes
+            population = remove_duplicates(population)
             
             # print the size of the population
             print(f'Population size after deduplication: {len(population)}')            
             
             # Deviation from original Guacamol code: use MolScore to score the population
             population_smiles = [molecule.smiles for molecule in population]
-            population_scores = scoring_function(population_smiles, flt=True, score_only=True)
-            
-            # Extract genes from deduplicated population
             updated_genes = [molecule.genes for molecule in population]
             
-            # Survival of the fittest: pair scores back to the molecules and sort by score
+            # ORIGINAL CODE
+            # population_scores = scoring_function(population_smiles, flt=True, score_only=True)
+            # Extract genes from deduplicated population
+            # updated_genes = [molecule.genes for molecule in population]
+            
+            if use_cache:
+                new_smiles = [smiles for smiles in population_smiles if smiles not in score_cache]
+                new_scores = scoring_function(new_smiles, flt=True, score_only=True)
+                score_cache.update({smiles: (score, gene) for smiles, score, gene in zip(new_smiles, new_scores, updated_genes)})
+                population_scores = [score_cache[smiles][0] for smiles in population_smiles]
+            else:
+                population_scores = scoring_function(population_smiles, flt=True, score_only=True)
+            
+            
+            # Survival of the fittest: select top molecules
             population = [Molecule(score, smiles, gene) for score, smiles, gene in zip(population_scores, population_smiles, updated_genes)]
             population = sorted(population, key=lambda x: x.score, reverse=True)[:self.population_size]
 
@@ -246,7 +299,6 @@ class SMILES_GA:
             for molecule in population:
                 print(f'{molecule.smiles} --> {molecule.score}')
             
-
             # Stats
             gen_time = time() - t0
             mol_sec = (self.population_size + self.n_mutations) / gen_time
@@ -295,7 +347,9 @@ def main(args):
             final_population_smiles = generator.generate_optimized_molecules(scoring_function=task, number_molecules=args.population_size)
     else:
         scoring_function = MolScore(model_name='smilesGA', task_config=args.molscore)
-        final_population_smiles = generator.generate_optimized_molecules(scoring_function=scoring_function, number_molecules=args.population_size)
+        final_population_smiles = generator.generate_optimized_molecules(scoring_function=scoring_function,
+                                                                         number_molecules=args.population_size,
+                                                                         use_cache=args.use_cache)
 
     with open(os.path.join(scoring_function.save_dir, 'final_population.smi'), 'w') as f:
         for smi, score in final_population_smiles:
@@ -317,6 +371,8 @@ def get_args():
     optional.add_argument('--n_jobs', type=int, default=-1, help='Number of parallel jobs')
     optional.add_argument('--random_start', action='store_true', help='Start with a random population')
     optional.add_argument('--patience', type=int, default=5, help='Early stopping patience')
+    #new addition
+    optional.add_argument('--use_cache', action='store_true', help='Enable caching of scored molecules to avoid recomputation')
     
     args = parser.parse_args()
     np.random.seed(args.seed)
