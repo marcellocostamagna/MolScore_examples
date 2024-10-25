@@ -23,6 +23,7 @@ import copy
 from molscore.utils.smiles_grammar import GCFG
 from collections import namedtuple
 from molscore.utils.cfg_util import encode, decode
+from ccdc.molecule import Molecule as CCDCMolecule
 
 Molecule = namedtuple('Molecule', ['score', 'smiles', 'gene'])
 
@@ -126,6 +127,43 @@ def mutate_no_score(p_gene):
         c_smiles = ''
 
     return Molecule(0.0, c_smiles, c_gene)
+    
+def robust_mutation(original_smiles, original_gene, max_attempts=10):
+    while max_attempts > 0:
+        # Step 1: Perform the mutation
+        c_gene = mutation(original_gene)
+        
+        try:
+            # Step 2: Check if mutation produces a syntactically valid SMILES
+            c_smiles = decode(gene_to_cfg(c_gene))
+
+            # Step 3: Check if the SMILES is not an empty string
+            if not c_smiles:
+                max_attempts -= 1
+                continue  
+
+            # Step 4: Check if the new SMILES is different from the original
+            if c_smiles == original_smiles:
+                max_attempts -= 1
+                continue  
+            
+            # Step 5: Check if a valid Molecule object can be generated
+            # We consider a molecule valid if it can be instantiated as a CCDCMolecule
+            molecule = CCDCMolecule.from_string(c_smiles)
+            if molecule is None:
+                max_attempts -= 1
+                continue 
+
+            # If all checks pass, return the new SMILES and gene
+            return c_smiles, c_gene
+
+        except Exception as e:
+            # If decoding fails, decrement attempts and retry
+            max_attempts -= 1
+            continue
+
+    # If all attempts are exhausted, return None to indicate failure
+    return None, None
 
 
 
@@ -245,14 +283,19 @@ class SMILES_GA:
             # Track scores to check for early stopping
             old_scores = [molecule.score for molecule in population]
             all_genes = [molecule.genes for molecule in population]
+            all_smiles = [molecule.smiles for molecule in population]
             choice_indices = np.random.choice(len(all_genes), self.n_mutations, replace=False)
             genes_to_mutate = [all_genes[i] for i in choice_indices]
+            smiles_to_mutate = [all_smiles[i] for i in choice_indices]
 
-            # Evolve genes
+            # EVOLVE/MUTATE GENES
             # Mutation using multiprocessing
-            joblist = (delayed(mutate_no_score)(g) for g in genes_to_mutate)
-            mutated_genes = self.pool(joblist)
+            joblist = (delayed(robust_mutation)(smiles, gene) for smiles, gene in zip(smiles_to_mutate, genes_to_mutate))
+            mutated_results = self.pool(joblist)
             
+            # Filter out failed mutations
+            mutated_genes = [Molecule(0.0, c_smiles, c_gene) for c_smiles, c_gene in mutated_results if c_smiles is not None]
+                        
             print('Number of genes to mutate:', len(genes_to_mutate))
             print('Number of mutated genes:', len(mutated_genes))
             # if len(genes_to_mutate) > 0:
