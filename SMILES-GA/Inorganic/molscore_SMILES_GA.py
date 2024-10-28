@@ -15,7 +15,9 @@ import numpy as np
 import argparse
 from time import time
 import os
-import joblib
+# import joblib
+import multiprocessing
+from functools import partial
 from joblib import delayed
 from molscore.manager import MolScore, MolScoreBenchmark
 import nltk
@@ -120,7 +122,8 @@ class SMILES_GA:
         """
         Initialize SMILES-based GA for molecule optimization.
         """
-        self.pool = joblib.Parallel(n_jobs=n_jobs)
+        # self.pool = joblib.Parallel(n_jobs=n_jobs)
+        self.n_jobs = n_jobs if n_jobs > 0 else os.cpu_count()
         self.smi_file = smi_file
         self.population_size = population_size
         self.n_mutations = n_mutations
@@ -153,8 +156,14 @@ class SMILES_GA:
         # Calculate initial genes with multiprocessing
         start_time = time()  # <-- Time tracking 
         print(f'Calculating initial genes...')
-        joblist = (delayed(cfg_to_gene)(encode(s), max_len=self.gene_size) for s in starting_population)
-        initial_genes = self.pool(joblist)
+        
+        # joblist = (delayed(cfg_to_gene)(encode(s), max_len=self.gene_size) for s in starting_population)
+        # initial_genes = self.pool(joblist)
+        
+        with multiprocessing.Pool(self.n_jobs) as pool:
+            initial_genes = pool.map(partial(cfg_to_gene, max_len=self.gene_size), [encode(s) for s in starting_population])
+        
+        
         print(f'Initial gene calculation took {time() - start_time:.2f} seconds')  # <-- Time tracking 
         
         # Insert SMILES and respective genes in the cache
@@ -198,8 +207,11 @@ class SMILES_GA:
             # EVOLVE/MUTATE GENES
             print(f'Mutating genes...')
             # Mutation using multiprocessing
-            joblist = (delayed(robust_mutation)(smiles, gene) for smiles, gene in zip(smiles_to_mutate, genes_to_mutate))
-            mutated_results = self.pool(joblist)
+            # joblist = (delayed(robust_mutation)(smiles, gene) for smiles, gene in zip(smiles_to_mutate, genes_to_mutate))
+            # mutated_results = self.pool(joblist)
+            with multiprocessing.Pool(self.n_jobs) as pool:
+                mutated_results = pool.starmap(robust_mutation, zip(smiles_to_mutate, genes_to_mutate))
+              
             print(f'Mutation phase took {time() - start_time:.2f} seconds')  # <-- Time tracking 
             
             # Insert mutated molecules into cache (This steo does also remove duplicates from the cache:
@@ -233,6 +245,7 @@ class SMILES_GA:
             t0 = time()
             
             # Extract the scores for use in the early stopping condition and statistics
+            population_smiles = [(molecule.smiles, molecule.score) for molecule in population]
             population_scores = [molecule.score for molecule in population]
 
             # Early stopping
@@ -252,6 +265,10 @@ class SMILES_GA:
                   f'std: {np.std(population_scores):.3f} | '
                   f'{gen_time:.2f} sec/gen | '
                   f'{mol_sec:.2f} mol/sec')
+            
+            with open(os.path.join(scoring_function.save_dir, f'population_{generation}.smi'), 'w') as f:
+                for smi, score in population_smiles:
+                    f.write(f'{smi}\t{score}\n')
 
         # Return final population
         return [(molecule.smiles, molecule.score) for molecule in population]
@@ -294,10 +311,10 @@ def get_args():
     # Optional arguments for GA setup
     optional = parser.add_argument_group('Optional')
     optional.add_argument('--seed', type=int, default=42, help='Random seed')
-    optional.add_argument('--population_size', type=int, default=10, help='Population size')
-    optional.add_argument('--n_mutations', type=int, default=5, help='Number of mutations per generation')
+    optional.add_argument('--population_size', type=int, default=20, help='Population size')
+    optional.add_argument('--n_mutations', type=int, default=10, help='Number of mutations per generation')
     optional.add_argument('--gene_size', type=int, default=-1, help='Gene size for the CFG-based encoding')
-    optional.add_argument('--generations', type=int, default=3, help='Number of generations')
+    optional.add_argument('--generations', type=int, default=10, help='Number of generations')
     optional.add_argument('--n_jobs', type=int, default=-1, help='Number of parallel jobs')
     optional.add_argument('--random_start', action='store_true', help='Start with a random population')
     optional.add_argument('--patience', type=int, default=5, help='Early stopping patience')
