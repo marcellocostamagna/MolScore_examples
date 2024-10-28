@@ -148,17 +148,26 @@ class SMILES_GA:
         # fetch initial population
         # Get the first 'population_size' SMILES from the list of all SMILES
         # The population size will ultimately be 100, but we will start with 20
+        print(f'Selecting initial population of {self.population_size} molecules...')
         starting_population = self.all_smiles[:self.population_size]
         
+        start_time = time()  # <-- Time tracking 
+        
         # Calculate initial genes with multiprocessing
+        print(f'Calculating initial genes...')
         joblist = (delayed(cfg_to_gene)(encode(s), max_len=self.gene_size) for s in starting_population)
         initial_genes = self.pool(joblist)
+        
+        print(f'Initial gene calculation took {time() - start_time:.2f} seconds')  # <-- Time tracking 
+        
+        start_time = time()  # <-- Time tracking 
         
         # Score initial population, using cache if enabled
         population_smiles = [s for s in starting_population]
         updated_genes = [g for g in initial_genes]        
         
         # Separate SMILES that need scoring from those already scored, if cache is used
+        print(f'Scoring and caching initial population...')
         if use_cache:
             new_smiles = [smiles for smiles in population_smiles if smiles not in score_cache]
             new_scores = scoring_function(new_smiles, flt=True, score_only=True)
@@ -169,11 +178,14 @@ class SMILES_GA:
         else:
             # Directly score all SMILES if no cache is used
             population_scores = scoring_function(population_smiles, flt=True, score_only=True)
-
+       
+        print(f'Scoring initial population took {time() - start_time:.2f} seconds')  # <-- Time tracking
+       
         # Initialize the population with scores and genes
         population = [Molecule(score, smiles, gene) for score, smiles, gene in zip(population_scores, population_smiles, updated_genes)]
         population = sorted(population, key=lambda x: x.score, reverse=True)[:self.population_size]
         
+        print(f'Starting evolution process...')
         # Evolution process
         t0 = time()
         patience = 0
@@ -185,48 +197,68 @@ class SMILES_GA:
             for molecule in population:
                 print(f'{molecule.smiles} --> {molecule.score}')
 
+
             # Track scores to check for early stopping
             old_scores = [molecule.score for molecule in population]
-            all_genes = [molecule.genes for molecule in population]
+            all_genes = [molecule.gene for molecule in population]
             all_smiles = [molecule.smiles for molecule in population]
             choice_indices = np.random.choice(len(all_genes), self.n_mutations, replace=False)
             genes_to_mutate = [all_genes[i] for i in choice_indices]
             smiles_to_mutate = [all_smiles[i] for i in choice_indices]
 
+            start_time = time()  # <-- Time tracking 
+            
             # EVOLVE/MUTATE GENES
             # Mutation using multiprocessing
             joblist = (delayed(robust_mutation)(smiles, gene) for smiles, gene in zip(smiles_to_mutate, genes_to_mutate))
             mutated_results = self.pool(joblist)
             
+            print(f'Mutation phase took {time() - start_time:.2f} seconds')  # <-- Time tracking 
+            
             # Filter out failed mutations
-            mutated_genes = [Molecule(0.0, c_smiles, c_gene) for c_smiles, c_gene in mutated_results if c_smiles is not None]
-                        
+            mutated_molecules = [
+                Molecule(0.0, c_smiles, c_gene) 
+                for c_smiles, c_gene in mutated_results if c_smiles is not None
+                ]
+                    
+            start_time = time()  # <-- Time tracking 
+                
             # Add mutated genes to the population and remove possible duplicates
-            population += mutated_genes
+            population += mutated_molecules
             population = remove_duplicates(population)
             
             # print the size of the population
-            print(f'Population size after deduplication: {len(population)}')            
+            print(f'Population size after removing duplicates: {len(population)}')    
+            print(f'Removal of duplicates phase took {time() - start_time:.2f} seconds')  # <-- Time tracking 
+                    
+            start_time = time()  # <-- Time tracking
             
             # Deviation from original Guacamol code: use MolScore to score the population
             population_smiles = [molecule.smiles for molecule in population]
-            updated_genes = [molecule.genes for molecule in population]
+            updated_genes = [molecule.gene for molecule in population]
 
             if use_cache:
                 new_smiles = [smiles for smiles in population_smiles if smiles not in score_cache]
                 new_scores = scoring_function(new_smiles, flt=True, score_only=True)
-                score_cache.update({smiles: (score, gene) for smiles, score, gene in zip(new_smiles, new_scores, updated_genes)})
+                score_cache.update({
+                    smiles: (score, updated_genes[idx]) 
+                    for idx, (smiles, score) in enumerate(zip(new_smiles, new_scores))})
                 population_scores = [score_cache[smiles][0] for smiles in population_smiles]
             else:
                 population_scores = scoring_function(population_smiles, flt=True, score_only=True)
             
+            print(f'Scoring phase took {time() - start_time:.2f} seconds')  # <-- Time tracking
+            
             # SELECTION: Survival of the fittest
-            population = [Molecule(score, smiles, gene) for score, smiles, gene in zip(population_scores, population_smiles, updated_genes)]
+            population = [
+                Molecule(score, smiles, gene) 
+                for score, smiles, gene in zip(population_scores, population_smiles, updated_genes)
+                ]
             population = sorted(population, key=lambda x: x.score, reverse=True)[:self.population_size]
 
-            print(f'Generation {generation}: after mutation and scoring')
-            for molecule in population:
-                print(f'{molecule.smiles} --> {molecule.score}')
+            # print(f'Generation {generation}: after mutation and scoring')
+            # for molecule in population:
+            #     print(f'{molecule.smiles} --> {molecule.score}')
             
             # Stats
             gen_time = time() - t0
@@ -307,5 +339,7 @@ def get_args():
 
 
 if __name__ == "__main__":
+    start = time()
     args = get_args()
     main(args)
+    print(f'Total Time Taken: {time() - start:.2f} seconds')
