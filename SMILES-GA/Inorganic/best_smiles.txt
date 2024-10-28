@@ -3,7 +3,6 @@ Cl[Ru]1(=Cc2ccccc2C(C)N1(C)CC)(Cl)[C]1N(CCN1c1c(C)cc(C)cc1C)c1c(C)cc(C)cc1C
 Cl[Ru]1(=CCC(C)(C)C=N1c1ccccc1)(Cl)[C]1N(CCN1c1c(C)cc(C)cc1C)c1c(C)cc(C)cc1C
 Cl[Ru]1(=Cc2ccccc2C(C)N1(CC)CC)(Cl)[C]1N(CCN1c1c(C)cc(C)cc1C)c1c(C)cc(C)cc1C
 Cl[Ru]1(=Cc2ccccc2O1C(C)C)(Cl)[C]1N(CCN1c1c(C)cc(C)cc1C)c1c(C)cc(C)cc1C
-Cl[Ru]1(=Cc2ccccc2O1C(C)C)(Cl)[C]1N(CCN1c1c(C)cc(C)cc1C)c1c(C)cc(C)cc1C
 Cl[Ru]1(=Cc2ccccc2N1(CC)CC)(Cl)[C]1N(CCN1c1c(C)cc(C)cc1C)c1c(C)cc(C)cc1C
 Cl[Ru]1(=Cc2ccccc2O1C(C)C)(Cl)[C]1N(CCN1c1c(C)cc(C)cc1C)c1c(C)cc(C)cc1C
 Cl[Ru]1(=Cc2ccccc2CN21CCCC2)(Cl)[C]1N(CCN1c1c(C)cc(C)cc1C)c1c(C)cc(C)cc1C

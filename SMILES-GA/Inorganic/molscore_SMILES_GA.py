@@ -1,11 +1,11 @@
+# Script to run the SMILES-GA optimization using MolScore with HSR scoring function
 
-#TODO: modify the origin of the code got from smiles GA implementation in Guacamol
 '''
-Adapted from:
-  Written by Jan H. Jensen 2018.
-  Many subsequent changes inspired by https://github.com/BenevolentAI/guacamol_baselines/tree/master/graph_ga
-And:
-  https://github.com/BenevolentAI/guacamol_baselines/blob/jtvae/graph_ga/goal_directed_generation.py
+Original Algorithm from:
+
+  doi:10.1246/cl.180665, https://github.com/tsudalab/ChemGE
+  
+  Many subsequent changes inspired by https://github.com/BenevolentAI/guacamol_baselines/tree/master/smiles_ga
 '''
 
 from rdkit import rdBase
@@ -157,7 +157,6 @@ class SMILES_GA:
         initial_genes = self.pool(joblist)
         print(f'Initial gene calculation took {time() - start_time:.2f} seconds')  # <-- Time tracking 
         
-       
         # Insert SMILES and respective genes in the cache
         # The score field will be empty (None) for now
         for smiles, gene in zip(starting_population, initial_genes):
@@ -166,16 +165,13 @@ class SMILES_GA:
         
         start_time = time()  # <-- Time tracking 
         # Separate SMILES that need scoring from those already scored, if cache is used
-        print(f'Scoring and caching initial population...') #(TODO: Remove or change position)
         # Find SMILES in the cache that need scoring (i.e., their score is None)
         smiles_to_score = [smiles for smiles in score_cache if score_cache[smiles]["score"] is None]
         # Score the SMILES that need scoring
         new_scores = scoring_function(smiles_to_score, flt=True, score_only=True)
-        
         # Update cache with the newly scored values
         for smiles, score in zip(smiles_to_score, new_scores):
             score_cache[smiles]["score"] = score
-
         print(f'Scoring initial population took {time() - start_time:.2f} seconds')  # <-- Time tracking
        
         # Initialize the population with scores and genes
@@ -190,12 +186,6 @@ class SMILES_GA:
 
         for generation in range(self.generations):
 
-            # print the population (This is for DEBUGGING purposes)
-            print(f'Generation {generation}:')
-            for molecule in population:
-                print(f'{molecule.smiles} --> {molecule.score}')
-
-
             # Track scores to check for early stopping
             old_scores = [molecule.score for molecule in population]
             all_genes = [molecule.gene for molecule in population]
@@ -205,12 +195,11 @@ class SMILES_GA:
             smiles_to_mutate = [all_smiles[i] for i in choice_indices]
 
             start_time = time()  # <-- Time tracking 
-            
             # EVOLVE/MUTATE GENES
+            print(f'Mutating genes...')
             # Mutation using multiprocessing
             joblist = (delayed(robust_mutation)(smiles, gene) for smiles, gene in zip(smiles_to_mutate, genes_to_mutate))
             mutated_results = self.pool(joblist)
-            
             print(f'Mutation phase took {time() - start_time:.2f} seconds')  # <-- Time tracking 
             
             # Insert mutated molecules into cache (This steo does also remove duplicates from the cache:
@@ -218,18 +207,15 @@ class SMILES_GA:
             for c_smiles, c_gene in mutated_results:
                 if c_smiles is not None and c_smiles not in score_cache:
                     score_cache[c_smiles] = {"score": None, "gene": c_gene}
-                    
                          
             start_time = time()  # <-- Time tracking 
-            
+            print(f'Scoring mutated genes...')
             # Score the MSILES that have not been scored yet
             smiles_to_score = [smiles for smiles in score_cache if score_cache[smiles]["score"] is None]
             new_scores = scoring_function(smiles_to_score, flt=True, score_only=True)
-            
             # Update cache with new scores
             for smiles, score in zip(smiles_to_score, new_scores):
                 score_cache[smiles]["score"] = score
-
             print(f'Scoring phase took {time() - start_time:.2f} seconds')  # <-- Time tracking
             
             # SELECTION: Survival of the fittest
@@ -319,7 +305,6 @@ def get_args():
     args = parser.parse_args()
     np.random.seed(args.seed)
     return args
-
 
 if __name__ == "__main__":
     start = time()
