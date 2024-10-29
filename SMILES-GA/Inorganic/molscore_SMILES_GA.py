@@ -26,8 +26,19 @@ from molscore.utils.smiles_grammar import GCFG
 from collections import namedtuple
 from molscore.utils.cfg_util import encode, decode
 from ccdc.molecule import Molecule as CCDCMolecule
+import signal
 
 Molecule = namedtuple('Molecule', ['score', 'smiles', 'gene'])
+
+class TimeoutException(Exception):
+    pass
+
+# Set up a timeout handler
+def timeout_handler(signum, frame):
+    raise TimeoutException
+
+# Set the signal handler for alarm
+signal.signal(signal.SIGALRM, timeout_handler)
 
 def cfg_to_gene(prod_rules, max_len=-1):
     gene = []
@@ -61,6 +72,37 @@ def gene_to_cfg(gene):
                      GCFG.productions()[rule].rhs())
         stack.extend(list(rhs)[::-1])
     return prod_rules
+
+# Define the smiles_to_gene function with a timeout
+def smiles_to_gene(smile, max_len=-1, timeout=20):
+    """
+    Converts a SMILES string to a gene representation using the encode and cfg_to_gene functions.
+    Uses a timeout to prevent long execution times.
+
+    :param smile: The SMILES string to be processed.
+    :param max_len: Maximum length of the gene.
+    :param timeout: Timeout value in seconds.
+    :return: The gene representation or None if the process times out.
+    """
+    try:
+        # Set the alarm for the timeout
+        signal.alarm(timeout)
+        # Step 1: Encode the SMILES string
+        prod_rules = encode(smile)
+        # Step 2: Convert to gene representation
+        gene = cfg_to_gene(prod_rules, max_len=max_len)
+        # Disable the alarm if it finishes successfully
+        signal.alarm(0)
+        return gene
+    except TimeoutException:
+        print(f"Timeout occurred while processing SMILES: {smile}")
+        return None
+    except Exception as e:
+        print(f"Error processing SMILES {smile}: {e}")
+        return None
+    finally:
+        # Always disable the alarm in the end to prevent it from affecting other parts of the code
+        signal.alarm(0)
 
 def mutation(gene):
     idx = np.random.choice(len(gene))
@@ -157,13 +199,16 @@ class SMILES_GA:
         # Calculate initial genes with multiprocessing 
         print(f'Calculating initial genes...')
         n_processes = min(self.n_jobs, len(starting_population), os.cpu_count())
+        timeout = 5
+        # Use partial functions to set the max_len and timeout parameters for the SMILES to gene conversion
+        smiles_to_gene_partial = partial(smiles_to_gene, max_len=self.gene_size, timeout=timeout)
         with multiprocessing.Pool(n_processes) as pool:
-            initial_genes = pool.map(partial(cfg_to_gene, max_len=self.gene_size), [encode(s) for s in starting_population])
-        
+            initial_genes = pool.map(smiles_to_gene_partial, starting_population)
+            
         # Insert SMILES and respective genes in the cache
         # The score field will be empty (None) for now
         for smiles, gene in zip(starting_population, initial_genes):
-            if smiles not in score_cache:
+            if smiles not in score_cache and gene is not None:
                 score_cache[smiles] = {"score": None, "gene": gene}  
 
         print(f'Scoring initial population...\n')
