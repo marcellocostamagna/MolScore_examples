@@ -29,26 +29,6 @@ from ccdc.molecule import Molecule as CCDCMolecule
 
 Molecule = namedtuple('Molecule', ['score', 'smiles', 'gene'])
 
-import json
-# temporary
-def change_output_dir(config_path: str, output_dir: str):
-    """
-    Modify the output directory in the MolScore configuration file.
-    
-    :param config_path: Path to the existing MolScore configuration file.
-    :param output_dir: The new output directory to set.
-    """
-    # Load the MolScore configuration file to modify the output directory
-    with open(config_path, 'r') as file:
-        molscore_config = json.load(file)
-
-    # Update the output directory in the configuration
-    molscore_config["output_dir"] = f'./{output_dir}/'
-
-    # Save the modified configuration back to a temporary file
-    with open(config_path, 'w') as file:
-        json.dump(molscore_config, file, indent=4)
-
 def cfg_to_gene(prod_rules, max_len=-1):
     gene = []
     for r in prod_rules:
@@ -160,6 +140,7 @@ class SMILES_GA:
     def generate_optimized_molecules(self, scoring_function, number_molecules: int,
                                      starting_population: Optional[List[str]] = None,) -> List[str]:
 
+        start_time = time() 
         # Initialize a cache for already scored molecules
         score_cache = {} 
         
@@ -173,10 +154,10 @@ class SMILES_GA:
         print(f'Selecting initial population of {self.population_size} molecules...')
         starting_population = self.all_smiles[:self.population_size]
         
-        # Calculate initial genes with multiprocessing
-        start_time = time()  # <-- Time tracking 
+        # Calculate initial genes with multiprocessing 
         print(f'Calculating initial genes...')
-        with multiprocessing.Pool(self.n_jobs) as pool:
+        n_processes = min(self.n_jobs, len(starting_population), os.cpu_count())
+        with multiprocessing.Pool(n_processes) as pool:
             initial_genes = pool.map(partial(cfg_to_gene, max_len=self.gene_size), [encode(s) for s in starting_population])
         
         # Insert SMILES and respective genes in the cache
@@ -200,6 +181,16 @@ class SMILES_GA:
                        for smiles,entry in score_cache.items() if entry["score"] is not None ]
         population = sorted(population, key=lambda x: x.score, reverse=True)[:self.population_size]
         
+        population_scores = [molecule.score for molecule in population]
+        
+        # Print details of initial population
+        print(f'Initial population | '
+                  f'max: {np.max(population_scores):.3f} | '
+                  f'avg: {np.mean(population_scores):.3f} | '
+                  f'min: {np.min(population_scores):.3f} | '
+                  f'std: {np.std(population_scores):.3f} | '
+                  f'{(time() - start_time):.2f} sec/gen \n')
+        
         print(f'Starting evolution process...\n')
         # Evolution process
         t0 = time()
@@ -218,8 +209,7 @@ class SMILES_GA:
             # EVOLVE/MUTATE GENES
             print(f'Mutating genes...')
             # Mutation using multiprocessing
-            # joblist = (delayed(robust_mutation)(smiles, gene) for smiles, gene in zip(smiles_to_mutate, genes_to_mutate))
-            # mutated_results = self.pool(joblist)
+            n_processes = min(self.n_jobs, len(smiles_to_mutate), os.cpu_count())
             with multiprocessing.Pool(self.n_jobs) as pool:
                 mutated_results = pool.starmap(robust_mutation, zip(smiles_to_mutate, genes_to_mutate))
                           
@@ -271,7 +261,7 @@ class SMILES_GA:
                   f'min: {np.min(population_scores):.3f} | '
                   f'std: {np.std(population_scores):.3f} | '
                   f'{gen_time:.2f} sec/gen | '
-                  f'{mol_sec:.2f} mol/sec')
+                  f'{mol_sec:.2f} mol/sec\n')
             
             with open(os.path.join(scoring_function.save_dir, f'population_{generation}.smi'), 'w') as f:
                 for smi, score in population_smiles:
@@ -320,10 +310,10 @@ def get_args():
     # Optional arguments for GA setup
     optional = parser.add_argument_group('Optional')
     optional.add_argument('--seed', type=int, default=42, help='Random seed')
-    optional.add_argument('--population_size', type=int, default=20, help='Population size')
-    optional.add_argument('--n_mutations', type=int, default=5, help='Number of mutations per generation')
+    optional.add_argument('--population_size', type=int, default=100, help='Population size')
+    optional.add_argument('--n_mutations', type=int, default=50, help='Number of mutations per generation')
     optional.add_argument('--gene_size', type=int, default=-1, help='Gene size for the CFG-based encoding')
-    optional.add_argument('--generations', type=int, default=25, help='Number of generations')
+    optional.add_argument('--generations', type=int, default=5, help='Number of generations')
     optional.add_argument('--n_jobs', type=int, default=-1, help='Number of parallel jobs')
     optional.add_argument('--random_start', action='store_true', help='Start with a random population')
     optional.add_argument('--patience', type=int, default=5, help='Early stopping patience')
@@ -333,19 +323,7 @@ def get_args():
     return args
 
 if __name__ == "__main__":
-    # start = time()
+    start = time()
     args = get_args()
-    attemts = 5
-
-    for i in range(attemts):
-        start = time()
-        output_dir = f'output_{i}'
-        if not os.path.exists(output_dir):
-            os.makedirs(output_dir)
-        
-        change_output_dir(args.molscore, output_dir)
-        print(f'Starting optimization attempt {i+1}...')
-        good = main(args)
-
-        print(f'Total Time Taken: {time() - start:.2f} seconds')
-    # print(f'Total Time Taken: {time() - start:.2f} seconds')
+    main(args)
+    print(f'Total Time Taken: {time() - start:.2f} seconds')
