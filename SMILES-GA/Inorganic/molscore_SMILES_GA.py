@@ -29,6 +29,26 @@ from ccdc.molecule import Molecule as CCDCMolecule
 
 Molecule = namedtuple('Molecule', ['score', 'smiles', 'gene'])
 
+import json
+# temporary
+def change_output_dir(config_path: str, output_dir: str):
+    """
+    Modify the output directory in the MolScore configuration file.
+    
+    :param config_path: Path to the existing MolScore configuration file.
+    :param output_dir: The new output directory to set.
+    """
+    # Load the MolScore configuration file to modify the output directory
+    with open(config_path, 'r') as file:
+        molscore_config = json.load(file)
+
+    # Update the output directory in the configuration
+    molscore_config["output_dir"] = f'./{output_dir}/'
+
+    # Save the modified configuration back to a temporary file
+    with open(config_path, 'w') as file:
+        json.dump(molscore_config, file, indent=4)
+
 def cfg_to_gene(prod_rules, max_len=-1):
     gene = []
     for r in prod_rules:
@@ -156,23 +176,16 @@ class SMILES_GA:
         # Calculate initial genes with multiprocessing
         start_time = time()  # <-- Time tracking 
         print(f'Calculating initial genes...')
-        
-        # joblist = (delayed(cfg_to_gene)(encode(s), max_len=self.gene_size) for s in starting_population)
-        # initial_genes = self.pool(joblist)
-        
         with multiprocessing.Pool(self.n_jobs) as pool:
             initial_genes = pool.map(partial(cfg_to_gene, max_len=self.gene_size), [encode(s) for s in starting_population])
-        
-        
-        print(f'Initial gene calculation took {time() - start_time:.2f} seconds')  # <-- Time tracking 
         
         # Insert SMILES and respective genes in the cache
         # The score field will be empty (None) for now
         for smiles, gene in zip(starting_population, initial_genes):
             if smiles not in score_cache:
                 score_cache[smiles] = {"score": None, "gene": gene}  
-        
-        start_time = time()  # <-- Time tracking 
+
+        print(f'Scoring initial population...\n')
         # Separate SMILES that need scoring from those already scored, if cache is used
         # Find SMILES in the cache that need scoring (i.e., their score is None)
         smiles_to_score = [smiles for smiles in score_cache if score_cache[smiles]["score"] is None]
@@ -181,14 +194,13 @@ class SMILES_GA:
         # Update cache with the newly scored values
         for smiles, score in zip(smiles_to_score, new_scores):
             score_cache[smiles]["score"] = score
-        print(f'Scoring initial population took {time() - start_time:.2f} seconds')  # <-- Time tracking
        
         # Initialize the population with scores and genes
         population = [ Molecule(entry["score"], smiles, entry["gene"]) 
                        for smiles,entry in score_cache.items() if entry["score"] is not None ]
         population = sorted(population, key=lambda x: x.score, reverse=True)[:self.population_size]
         
-        print(f'Starting evolution process...')
+        print(f'Starting evolution process...\n')
         # Evolution process
         t0 = time()
         patience = 0
@@ -203,7 +215,6 @@ class SMILES_GA:
             genes_to_mutate = [all_genes[i] for i in choice_indices]
             smiles_to_mutate = [all_smiles[i] for i in choice_indices]
 
-            start_time = time()  # <-- Time tracking 
             # EVOLVE/MUTATE GENES
             print(f'Mutating genes...')
             # Mutation using multiprocessing
@@ -211,24 +222,20 @@ class SMILES_GA:
             # mutated_results = self.pool(joblist)
             with multiprocessing.Pool(self.n_jobs) as pool:
                 mutated_results = pool.starmap(robust_mutation, zip(smiles_to_mutate, genes_to_mutate))
-              
-            print(f'Mutation phase took {time() - start_time:.2f} seconds')  # <-- Time tracking 
-            
+                          
             # Insert mutated molecules into cache (This steo does also remove duplicates from the cache:
             # If a mutated smiles is equal to another one already present it is not added)
             for c_smiles, c_gene in mutated_results:
                 if c_smiles is not None and c_smiles not in score_cache:
                     score_cache[c_smiles] = {"score": None, "gene": c_gene}
                          
-            start_time = time()  # <-- Time tracking 
-            print(f'Scoring mutated genes...')
+            print(f'Scoring mutated genes...\n')
             # Score the MSILES that have not been scored yet
             smiles_to_score = [smiles for smiles in score_cache if score_cache[smiles]["score"] is None]
             new_scores = scoring_function(smiles_to_score, flt=True, score_only=True)
             # Update cache with new scores
             for smiles, score in zip(smiles_to_score, new_scores):
                 score_cache[smiles]["score"] = score
-            print(f'Scoring phase took {time() - start_time:.2f} seconds')  # <-- Time tracking
             
             # SELECTION: Survival of the fittest
             # Create population from cache
@@ -301,6 +308,8 @@ def main(args):
     with open(os.path.join(scoring_function.save_dir, 'final_population.smi'), 'w') as f:
         for smi, score in final_population_smiles:
             f.write(f'{smi}\t{score}\n')
+            
+    return True
 
 
 def get_args():
@@ -312,9 +321,9 @@ def get_args():
     optional = parser.add_argument_group('Optional')
     optional.add_argument('--seed', type=int, default=42, help='Random seed')
     optional.add_argument('--population_size', type=int, default=20, help='Population size')
-    optional.add_argument('--n_mutations', type=int, default=10, help='Number of mutations per generation')
+    optional.add_argument('--n_mutations', type=int, default=5, help='Number of mutations per generation')
     optional.add_argument('--gene_size', type=int, default=-1, help='Gene size for the CFG-based encoding')
-    optional.add_argument('--generations', type=int, default=10, help='Number of generations')
+    optional.add_argument('--generations', type=int, default=25, help='Number of generations')
     optional.add_argument('--n_jobs', type=int, default=-1, help='Number of parallel jobs')
     optional.add_argument('--random_start', action='store_true', help='Start with a random population')
     optional.add_argument('--patience', type=int, default=5, help='Early stopping patience')
@@ -324,7 +333,19 @@ def get_args():
     return args
 
 if __name__ == "__main__":
-    start = time()
+    # start = time()
     args = get_args()
-    main(args)
-    print(f'Total Time Taken: {time() - start:.2f} seconds')
+    attemts = 5
+
+    for i in range(attemts):
+        start = time()
+        output_dir = f'output_{i}'
+        if not os.path.exists(output_dir):
+            os.makedirs(output_dir)
+        
+        change_output_dir(args.molscore, output_dir)
+        print(f'Starting optimization attempt {i+1}...')
+        good = main(args)
+
+        print(f'Total Time Taken: {time() - start:.2f} seconds')
+    # print(f'Total Time Taken: {time() - start:.2f} seconds')
