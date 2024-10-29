@@ -1,35 +1,35 @@
 {
-  "task": "hsr_test",
-  "output_dir": "./",
-  "load_from_previous": false,
-  "logging": true,
-  "monitor_app": true,
-  "termination_exit": false,
-  "scoring_functions": [
-    {
-      "name": "HSR",
-      "run": true,
-      "parameters": {
-        "prefix": "hsrP",
-        "ref_molecule": "/Users/marcellocostamagna/MolScore/MolScore_examples/SMILES-GA/Inorganic/target.sdf",
-        "generator": "ccdc",
-        "n_jobs": 8
-      }
-    }
-  ],
-  "scoring": {
-    "metrics": [
-      {
-        "name": "hsrP_HSR_score",
-        "filter": false,
-        "weight": 1.0,
-        "modifier": "raw",
-        "parameters": {}
-      }
+    "task": "hsr_test",
+    "output_dir": "./",
+    "load_from_previous": false,
+    "logging": true,
+    "monitor_app": true,
+    "termination_exit": false,
+    "scoring_functions": [
+        {
+            "name": "HSR",
+            "run": true,
+            "parameters": {
+                "prefix": "hsrP",
+                "ref_molecule": "/Users/marcellocostamagna/MolScore/MolScore_examples/SMILES-GA/Inorganic/target.sdf",
+                "generator": "ccdc",
+                "n_jobs": 8
+            }
+        }
     ],
-    "method": "single"
-  },
-  "diversity_filter": {
-    "run": false
-  }
+    "scoring": {
+        "metrics": [
+            {
+                "name": "hsrP_HSR_score",
+                "filter": false,
+                "weight": 1.0,
+                "modifier": "raw",
+                "parameters": {}
+            }
+        ],
+        "method": "single"
+    },
+    "diversity_filter": {
+        "run": false
+    }
 }
