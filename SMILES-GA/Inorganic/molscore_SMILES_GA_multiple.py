@@ -30,6 +30,24 @@ import signal
 
 Molecule = namedtuple('Molecule', ['score', 'smiles', 'gene'])
 
+import json
+# temporary
+def change_output_dir(config_path: str, output_dir: str):
+    """
+    Modify the output directory in the MolScore configuration file.
+    
+    :param config_path: Path to the existing MolScore configuration file.
+    :param output_dir: The new output directory to set.
+    """
+    # Load the MolScore configuration file to modify the output directory
+    with open(config_path, 'r') as file:
+        molscore_config = json.load(file)
+    # Update the output directory in the configuration
+    molscore_config["output_dir"] = f'./{output_dir}/'
+    # Save the modified configuration back to a temporary file
+    with open(config_path, 'w') as file:
+        json.dump(molscore_config, file, indent=4)
+
 class TimeoutException(Exception):
     pass
 
@@ -74,7 +92,7 @@ def gene_to_cfg(gene):
     return prod_rules
 
 # Define the smiles_to_gene function with a timeout
-def smiles_to_gene(smile, max_len=-1, timeout=20):
+def smiles_to_gene(smile, max_len=-1, timeout=30):
     """
     Converts a SMILES string to a gene representation using the encode and cfg_to_gene functions.
     Uses a timeout to prevent long execution times.
@@ -358,8 +376,8 @@ def get_args():
     optional.add_argument('--population_size', type=int, default=100, help='Population size')
     optional.add_argument('--n_mutations', type=int, default=50, help='Number of mutations per generation')
     optional.add_argument('--gene_size', type=int, default=-1, help='Gene size for the CFG-based encoding')
-    optional.add_argument('--generations', type=int, default=2, help='Number of generations')
-    optional.add_argument('--n_jobs', type=int, default=100, help='Number of parallel jobs')
+    optional.add_argument('--generations', type=int, default=100, help='Number of generations')
+    optional.add_argument('--n_jobs', type=int, default=8, help='Number of parallel jobs')
     optional.add_argument('--random_start', action='store_true', help='Start with a random population')
     optional.add_argument('--patience', type=int, default=5, help='Early stopping patience')
     
@@ -368,7 +386,27 @@ def get_args():
     return args
 
 if __name__ == "__main__":
-    start = time()
+    start_time = time()
+    # start = time()
     args = get_args()
-    main(args)
-    print(f'Total Time Taken: {time() - start:.2f} seconds')
+
+    txt_files = ['smiles_0_6.txt' , 'smiles_0_7.txt', 'smiles_0_8.txt']
+    attempts_per_file = 2
+    for txt_file in txt_files:
+        
+        args.smiles_file = txt_file
+        
+        for i in range(attempts_per_file):
+            start = time()
+            
+            output_dir = f'output_{txt_file.split(".")[0]}_{i+1}'
+            
+            if not os.path.exists(output_dir):
+                os.makedirs(output_dir)
+            
+            change_output_dir(args.molscore, output_dir)
+            
+            print(f'Starting optimization attempt {i+1} with SMILES file: {args.smiles_file}...')
+            good = main(args)
+            print(f'Total Time Taken: {time() - start:.2f} seconds')
+    print(f'Total Time Taken: {time() - start_time:.2f} seconds')

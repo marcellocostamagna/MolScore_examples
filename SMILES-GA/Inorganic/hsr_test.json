@@ -1,9 +1,9 @@
 {
     "task": "hsr_test",
-    "output_dir": "./",
+    "output_dir": "./output_smiles_0_8_2/",
     "load_from_previous": false,
     "logging": true,
-    "monitor_app": true,
+    "monitor_app": false,
     "termination_exit": false,
     "scoring_functions": [
         {
