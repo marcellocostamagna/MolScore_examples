@@ -11,7 +11,8 @@
       "run": true,
       "parameters": {
         "prefix": "hsrP",
-        "ref_molecule": "/Users/marcellocostamagna/MolScore/MolScore_examples/3D_SAMPLER/target_mercury.sdf",
+        "ref_molecule": "/Users/marcellocostamagna/MolScore/MolScore_examples/3D_SAMPLER/target_organic.sdf",
+        "generator": "ccdc",
         "n_jobs": 1
       }
     }
@@ -19,7 +20,7 @@
   "scoring": {
     "metrics": [
       {
-        "name": "hsr_score",
+        "name": "hsrP_HSR_score",
         "filter": false,
         "weight": 1.0,
         "modifier": "raw",
