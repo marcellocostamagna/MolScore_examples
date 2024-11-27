@@ -1,0 +1,114 @@
+{
+    // Use IntelliSense to learn about possible attributes.
+    // Hover to view descriptions of existing attributes.
+    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+        
+        {
+            "name": "Python Debugger: SMILES-GA with Arguments (Inorganic)",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${file}",
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}/SMILES-GA/Inorganic",
+            "args": [
+                "--molscore",
+                "hsr_test.json",
+                "--smiles_file",
+                "smiles_Ru_100.txt",
+            ],
+            "justMyCode": false
+        },
+        {
+            "name": "Python Debugger: 3D sampler n Generations with Arguments (Inorganic)",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${file}",
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}/3D_SAMPLER",
+            "args": [
+                "--molscore",
+                "3D_test_inorganic.json",
+                "--init_dir",
+                "initial_molecules_inorganic",
+            ],
+            "justMyCode": false
+        },
+        {
+            "name": "Python Debugger: 3D sampler with Arguments (Inorganic)",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${file}",
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}/3D_SAMPLER",
+            "args": [
+                "--molscore",
+                "3D_test_inorganic.json",
+                "--init_dir",
+                "initial_molecules_inorganic",
+            ],
+            "justMyCode": false
+        },
+        {
+            "name": "Python Debugger: 3D sampler n Generations with Arguments (Organic)",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${file}",
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}/3D_SAMPLER",
+            "args": [
+                "--molscore",
+                "3D_test_organic.json",
+                "--init_dir",
+                "initial_molecules_organic",
+            ],
+            "justMyCode": false
+        },
+        {
+            "name": "Python Debugger: 3D sampler with Arguments (Organic)",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${file}",
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}/3D_SAMPLER",
+            "args": [
+                "--molscore",
+                "3D_test_organic.json",
+                "--init_dir",
+                "initial_molecules_organic",
+            ],
+            "justMyCode": false
+        },
+        {
+            "name": "Python Debugger: SMILES-GA with Arguments (Organic)",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${file}",
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}/SMILES-GA/Organic",
+            "args": [
+                "--molscore",
+                "hsr_test.json",
+                "--smiles_file",
+                "ZINC_first_100.smi",
+            ],
+            "justMyCode": false
+        },
+        {
+            "name": "Python Debugger: GRAPH-GA with Arguments",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${file}",
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}/GraphGA",
+            "args": [
+                "--molscore",
+                "hsr_test.json",
+                "--smiles_file",
+                "ZINC_first_100.smi",
+            ],
+            "justMyCode": false
+        }
+    ]
+}
