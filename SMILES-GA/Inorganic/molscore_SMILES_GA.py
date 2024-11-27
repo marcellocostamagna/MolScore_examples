@@ -20,6 +20,7 @@ import multiprocessing
 from functools import partial
 from joblib import delayed
 from molscore.manager import MolScore, MolScoreBenchmark
+from molscore.scoring_functions.utils import timedFunc2
 import nltk
 import copy
 from molscore.utils.smiles_grammar import GCFG
@@ -179,7 +180,7 @@ class SMILES_GA:
         with open(smi_file) as f:
             return [s.strip() for s in f if s.strip()]
 
-    def generate_optimized_molecules(self, scoring_function, number_molecules: int,
+    def generate_optimized_molecules(self, scoring_function, number_molecules: int, output_dir=None,
                                      starting_population: Optional[List[str]] = None,) -> List[str]:
 
         start_time = time() 
@@ -202,6 +203,7 @@ class SMILES_GA:
         timeout = 5
         # Use partial functions to set the max_len and timeout parameters for the SMILES to gene conversion
         smiles_to_gene_partial = partial(smiles_to_gene, max_len=self.gene_size, timeout=timeout)
+        
         with multiprocessing.Pool(n_processes) as pool:
             initial_genes = pool.map(smiles_to_gene_partial, starting_population)
             
@@ -308,7 +310,7 @@ class SMILES_GA:
                   f'{gen_time:.2f} sec/gen | '
                   f'{mol_sec:.2f} mol/sec\n')
             
-            with open(os.path.join(scoring_function.save_dir, f'population_{generation}.smi'), 'w') as f:
+            with open(os.path.join(output_dir, f'population_{generation}.smi'), 'w') as f:
                 for smi, score in population_smiles:
                     f.write(f'{smi}\t{score}\n')
 
@@ -336,11 +338,12 @@ def main(args):
         for task in scoring_function:
             final_population_smiles = generator.generate_optimized_molecules(scoring_function=task, number_molecules=args.population_size)
     else:
-        scoring_function = MolScore(model_name='smilesGA', task_config=args.molscore)
-        final_population_smiles = generator.generate_optimized_molecules(scoring_function=scoring_function,
-                                                                         number_molecules=args.population_size)
+        ms = MolScore(model_name='smilesGA', task_config=args.molscore)
+        final_population_smiles = generator.generate_optimized_molecules(scoring_function=ms.score,
+                                                                         number_molecules=args.population_size,
+                                                                         output_dir=ms.save_dir)
 
-    with open(os.path.join(scoring_function.save_dir, 'final_population.smi'), 'w') as f:
+    with open(os.path.join(ms.save_dir, 'final_population.smi'), 'w') as f:
         for smi, score in final_population_smiles:
             f.write(f'{smi}\t{score}\n')
             
@@ -355,11 +358,11 @@ def get_args():
     # Optional arguments for GA setup
     optional = parser.add_argument_group('Optional')
     optional.add_argument('--seed', type=int, default=42, help='Random seed')
-    optional.add_argument('--population_size', type=int, default=100, help='Population size')
-    optional.add_argument('--n_mutations', type=int, default=50, help='Number of mutations per generation')
+    optional.add_argument('--population_size', type=int, default=50, help='Population size')
+    optional.add_argument('--n_mutations', type=int, default=5, help='Number of mutations per generation')
     optional.add_argument('--gene_size', type=int, default=-1, help='Gene size for the CFG-based encoding')
     optional.add_argument('--generations', type=int, default=2, help='Number of generations')
-    optional.add_argument('--n_jobs', type=int, default=100, help='Number of parallel jobs')
+    optional.add_argument('--n_jobs', type=int, default=8, help='Number of parallel jobs')
     optional.add_argument('--random_start', action='store_true', help='Start with a random population')
     optional.add_argument('--patience', type=int, default=5, help='Early stopping patience')
     
