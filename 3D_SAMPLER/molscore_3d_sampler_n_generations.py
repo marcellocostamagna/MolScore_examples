@@ -89,7 +89,7 @@ def main(args):
 
     # HOW TO COMPUTE SCORES OF MOLECULE OBJECTS (NOT SMILES)
     # Score all the molecules with caching enabled (Generation 0)
-    scores = ms.score(mol_ids=batch1_ids, molecular_inputs=batch1, flt=True, score_only=True)
+    scores = ms.score(mol_ids=batch1_ids, molecular_inputs=batch1, flt=True, score_only=False)
     
     # SIMULATION of a GA
     # Select the best k molecules
@@ -102,7 +102,7 @@ def main(args):
     # Add new molecules to the population (Genration 1)
     new_molecules = best_molecules + batch2
     gen1_ids = best_mol_ids + batch2_ids
-    scores = ms.score(mol_ids=gen1_ids, molecular_inputs=new_molecules, flt=True, score_only=True)
+    scores = ms.score(mol_ids=gen1_ids, molecular_inputs=new_molecules, flt=True, score_only=False)
     
     # Select the best k molecules
     selected_indices = np.argsort(scores)[::-1][:args.population_size]
