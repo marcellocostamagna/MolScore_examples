@@ -12,7 +12,7 @@
       "parameters": {
         "prefix": "hsrP",
         "ref_molecule": "/Users/marcellocostamagna/MolScore/MolScore_examples/SMILES-GA/Organic/target.sdf",
-        "generator": "obabel",
+        "generator": "rdkit",
         "n_jobs": 1
       }
     }

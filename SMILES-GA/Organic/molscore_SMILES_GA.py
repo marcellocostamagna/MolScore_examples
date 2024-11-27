@@ -23,6 +23,8 @@ import copy
 from molscore.utils.smiles_grammar import GCFG
 from collections import namedtuple
 from molscore.utils.cfg_util import encode, decode
+import rdkit
+from rdkit import Chem
 
 Molecule = namedtuple('Molecule', ['score', 'smiles', 'genes'])
 
@@ -110,6 +112,43 @@ def mutate(p_gene, scoring_function):
          
     return Molecule(c_score, c_smiles, c_gene)
 
+def robust_mutation(original_smiles, original_gene, max_attempts=10):
+    while max_attempts > 0:
+        # Step 1: Perform the mutation
+        c_gene = mutation(original_gene)
+        
+        try:
+            # Step 2: Check if mutation produces a syntactically valid SMILES
+            c_smiles = decode(gene_to_cfg(c_gene))
+
+            # Step 3: Check if the SMILES is not an empty string
+            if not c_smiles:
+                max_attempts -= 1
+                continue  
+
+            # Step 4: Check if the new SMILES is different from the original
+            if c_smiles == original_smiles:
+                max_attempts -= 1
+                continue  
+            
+            # Step 5: Check if a valid Molecule object can be generated
+            # We consider a molecule valid if it can be instantiated as an rdkit molecule
+            molecule = Chem.MolFromSmiles(c_smiles)
+            if molecule is None:
+                max_attempts -= 1
+                continue 
+
+            # If all checks pass, return the new SMILES and gene
+            return c_smiles, c_gene
+
+        except Exception as e:
+            # If decoding fails, decrement attempts and retry
+            max_attempts -= 1
+            continue
+
+    # If all attempts are exhausted, return None to indicate failure
+    return None, None
+
 
 
 class SMILES_GA:
@@ -186,32 +225,44 @@ class SMILES_GA:
             all_genes = [molecule.genes for molecule in population]
             choice_indices = np.random.choice(len(all_genes), self.n_mutations, replace=True)
             genes_to_mutate = [all_genes[i] for i in choice_indices]
+            # Get the SMILES of the genes to mutate
+            smiles_to_mutate = [molecule.smiles for molecule in population if molecule.genes in genes_to_mutate]
 
             # Evolve genes
             # joblist = (delayed(mutate)(g, scoring_function) for g in genes_to_mutate)
             # new_population = self.pool(joblist)
             # Deviation from original Guacamol code: directly mutate genes and score SMILES
-            new_population = [mutate(g, scoring_function) for g in genes_to_mutate]
+            # new_population = [mutate(g, scoring_function) for g in genes_to_mutate]
+            # Iterate through the genes_to_mutate and smiles_to_mutate with robust_mutation
+            new_population = []
+            for gene, smiles in zip(genes_to_mutate, smiles_to_mutate):
+                new_smiles, _ = robust_mutation(smiles, gene)
+                new_population.append(new_smiles)
             
             print(f'Generated {len(new_population)} new molecules')
     
-
-            # Deduplicate
-            population += new_population
-            population = deduplicate(population)
+            # # Deduplicate
+            # population += new_population
+            # population = deduplicate(population)
+            
+            population_smiles = [molecule.smiles for molecule in population]
+            population_smiles += new_population
             
             # print the size of the population
             print(f'Population size after deduplication: {len(population)}')            
             
             # Deviation from original Guacamol code: use MolScore to score the population
             population_smiles = [molecule.smiles for molecule in population]
-            population_scores = scoring_function(population_smiles, flt=True, score_only=True)
-            
+            #NOTE: Recalculate was added since, with low population sizes, not enough novel, valid molecules 
+            # be generated to fill the population
+            population_scores = scoring_function(population_smiles, flt=True, score_only=False, recalculate=True)
 
             # Survival of the fittest: pair scores back to the molecules and sort by score
             population = [Molecule(score, smiles, gene) for score, smiles, gene in zip(population_scores, population_smiles, all_genes)]
             population = sorted(population, key=lambda x: x.score, reverse=True)[:self.population_size]
 
+            #TODO: Add elitism to the GA
+            
             # Stats
             gen_time = time() - t0
             mol_sec = (self.population_size + self.n_mutations) / gen_time
@@ -259,10 +310,10 @@ def main(args):
         for task in scoring_function:
             final_population_smiles = generator.generate_optimized_molecules(scoring_function=task, number_molecules=args.population_size)
     else:
-        scoring_function = MolScore(model_name='smilesGA', task_config=args.molscore)
-        final_population_smiles = generator.generate_optimized_molecules(scoring_function=scoring_function, number_molecules=args.population_size)
+        ms = MolScore(model_name='smilesGA', task_config=args.molscore)
+        final_population_smiles = generator.generate_optimized_molecules(scoring_function=ms.score, number_molecules=args.population_size)
 
-    with open(os.path.join(scoring_function.save_dir, 'final_population.smi'), 'w') as f:
+    with open(os.path.join(ms.save_dir, 'final_population.smi'), 'w') as f:
         for smi, score in final_population_smiles:
             f.write(f'{smi}\t{score}\n')
 
@@ -275,8 +326,8 @@ def get_args():
     # Optional arguments for GA setup
     optional = parser.add_argument_group('Optional')
     optional.add_argument('--seed', type=int, default=42, help='Random seed')
-    optional.add_argument('--population_size', type=int, default=10, help='Population size')
-    optional.add_argument('--n_mutations', type=int, default=10, help='Number of mutations per generation')
+    optional.add_argument('--population_size', type=int, default=20, help='Population size')
+    optional.add_argument('--n_mutations', type=int, default=15, help='Number of mutations per generation')
     optional.add_argument('--gene_size', type=int, default=-1, help='Gene size for the CFG-based encoding')
     optional.add_argument('--generations', type=int, default=5, help='Number of generations')
     optional.add_argument('--n_jobs', type=int, default=-1, help='Number of parallel jobs')
