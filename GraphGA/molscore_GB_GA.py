@@ -224,8 +224,8 @@ def main(args):
             final_population_smiles = generator.generate_optimized_molecules(scoring_function=task)
 
     else:
-        scoring_function = MolScore(model_name='graphGA', task_config=args.molscore)
-        final_population_smiles = generator.generate_optimized_molecules(scoring_function=scoring_function)
+        ms = MolScore(model_name='graphGA', task_config=args.molscore)
+        final_population_smiles = generator.generate_optimized_molecules(scoring_function=ms.score)
 
     with open(os.path.join(scoring_function.save_dir, 'final_population.smi'), 'w') as f:
         [f.write(smi + '\n') for smi in final_population_smiles]
