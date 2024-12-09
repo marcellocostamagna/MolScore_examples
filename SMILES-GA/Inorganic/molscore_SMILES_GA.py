@@ -125,31 +125,25 @@ def robust_mutation(original_smiles, original_gene, max_attempts=10):
     while max_attempts > 0:
         # Step 1: Perform the mutation
         c_gene = mutation(original_gene)
-        
         try:
             # Step 2: Check if mutation produces a syntactically valid SMILES
             c_smiles = decode(gene_to_cfg(c_gene))
-
             # Step 3: Check if the SMILES is not an empty string
             if not c_smiles:
                 max_attempts -= 1
                 continue  
-
             # Step 4: Check if the new SMILES is different from the original
             if c_smiles == original_smiles:
                 max_attempts -= 1
                 continue  
-            
             # Step 5: Check if a valid Molecule object can be generated
             # We consider a molecule valid if it can be instantiated as a CCDCMolecule
             molecule = CCDCMolecule.from_string(c_smiles)
             if molecule is None:
                 max_attempts -= 1
                 continue 
-
             # If all checks pass, return the new SMILES and gene
             return c_smiles, c_gene
-
         except Exception as e:
             # If decoding fails, decrement attempts and retry
             max_attempts -= 1
@@ -191,9 +185,8 @@ class SMILES_GA:
             self.population_size = number_molecules
             print(f'Benchmark requested more molecules than expected: new population is {number_molecules}')
             
-        # fetch initial population
+        # Fetch initial population
         # Get the first 'population_size' SMILES from the list of all SMILES
-        # The population size will ultimately be 100, but we will start with 20
         print(f'Selecting initial population of {self.population_size} molecules...')
         starting_population = self.all_smiles[:self.population_size]
         
@@ -201,9 +194,7 @@ class SMILES_GA:
         print(f'Calculating initial genes...')
         n_processes = min(self.n_jobs, len(starting_population), os.cpu_count())
         timeout = 5
-        # Use partial functions to set the max_len and timeout parameters for the SMILES to gene conversion
         smiles_to_gene_partial = partial(smiles_to_gene, max_len=self.gene_size, timeout=timeout)
-        
         with multiprocessing.Pool(n_processes) as pool:
             initial_genes = pool.map(smiles_to_gene_partial, starting_population)
             
@@ -255,24 +246,46 @@ class SMILES_GA:
 
             # EVOLVE/MUTATE GENES
             print(f'Mutating genes...')
-            # Mutation using multiprocessing
+            # 1- Generation of children: mutation of genes
             n_processes = min(self.n_jobs, len(smiles_to_mutate), os.cpu_count())
             with multiprocessing.Pool(self.n_jobs) as pool:
                 mutated_results = pool.starmap(robust_mutation, zip(smiles_to_mutate, genes_to_mutate))
-                          
-            # Insert mutated molecules into cache (This steo does also remove duplicates from the cache:
-            # If a mutated smiles is equal to another one already present it is not added)
+            
+            # # TODO: (to be removed) DEPRECATED since we are removing only the perfectly identictal SMILES and not the ones that are similar
+            # # but actully represent the same molecule              
+            # # Insert mutated molecules into cache (This step does also remove duplicates from the cache:
+            # # If a mutated smiles is equal to another one already present it is not added)
+            # for c_smiles, c_gene in mutated_results:
+            #     if c_smiles is not None and c_smiles not in score_cache:
+            #         score_cache[c_smiles] = {"score": None, "gene": c_gene}
+                    
+            # 2- Collect candidates to score (remove SMILES that are already in the cache)
+            candidates_to_score = []
+            candidates_genes = []
             for c_smiles, c_gene in mutated_results:
                 if c_smiles is not None and c_smiles not in score_cache:
-                    score_cache[c_smiles] = {"score": None, "gene": c_gene}
-                         
+                    candidates_to_score.append(c_smiles)
+                    candidates_genes.append(c_gene)
+            
+            # 3- Score the candidates         
             print(f'Scoring mutated genes...\n')
-            # Score the MSILES that have not been scored yet
-            smiles_to_score = [smiles for smiles in score_cache if score_cache[smiles]["score"] is None]
-            new_scores = scoring_function(smiles_to_score, flt=True, score_only=True)
-            # Update cache with new scores
-            for smiles, score in zip(smiles_to_score, new_scores):
-                score_cache[smiles]["score"] = score
+            # Score the SMILES that have not been scored yet
+            
+            # smiles_to_score = [smiles for smiles in score_cache if score_cache[smiles]["score"] is None]
+            # new_scores = scoring_function(smiles_to_score, flt=True, score_only=True)
+            
+            new_scores = scoring_function(candidates_to_score, flt=True, score_only=True)
+            
+            
+            # 4- Update cache with new scores
+    
+            # # Update cache with new scores
+            # for smiles, score in zip(smiles_to_score, new_scores):
+            #     score_cache[smiles]["score"] = score
+            
+            # for candidate_smiles, candidate_gene, candidate_score in zip(candidates_to_score, candidates_genes, new_scores):
+            #     if diversity_check(candidate_smiles, candidate_score, population):
+                
             
             # SELECTION: Survival of the fittest
             # Create population from cache
@@ -358,10 +371,10 @@ def get_args():
     # Optional arguments for GA setup
     optional = parser.add_argument_group('Optional')
     optional.add_argument('--seed', type=int, default=42, help='Random seed')
-    optional.add_argument('--population_size', type=int, default=50, help='Population size')
-    optional.add_argument('--n_mutations', type=int, default=5, help='Number of mutations per generation')
+    optional.add_argument('--population_size', type=int, default=100, help='Population size')
+    optional.add_argument('--n_mutations', type=int, default=50, help='Number of mutations per generation')
     optional.add_argument('--gene_size', type=int, default=-1, help='Gene size for the CFG-based encoding')
-    optional.add_argument('--generations', type=int, default=2, help='Number of generations')
+    optional.add_argument('--generations', type=int, default=1000, help='Number of generations')
     optional.add_argument('--n_jobs', type=int, default=8, help='Number of parallel jobs')
     optional.add_argument('--random_start', action='store_true', help='Start with a random population')
     optional.add_argument('--patience', type=int, default=5, help='Early stopping patience')
