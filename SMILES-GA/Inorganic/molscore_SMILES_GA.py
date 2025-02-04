@@ -369,9 +369,23 @@ class SMILES_GA:
         # Return final population
         return [(molecule.smiles, molecule.score) for molecule in population]
 
+def get_population(population_file):
+    """
+    Return a list of SMILES from a population file. 
+    """
+    
 
 def main(args):
-    generator = SMILES_GA(smi_file=args.smiles_file,
+    
+    # Get populations files from the directory in order (The will have names population_1, population_2, etc)
+    populations = [os.path.join(args.populations_dir, f'population_{i}.smi') for i in range(1, 100) if os.path.exists(os.path.join(args.populations_dir, f'population_{i}.sdf'))]    
+    
+    if args.molscore in MolScoreBenchmark.presets:
+        benchmark = MolScoreBenchmark(model_name='smilesGA', output_dir="./", budget=1000, benchmark=args.molscore)
+        for task, population in zip(benchmark, populations):
+            
+            # Initialize the GA generator with the correct population
+            generator = SMILES_GA(smi_file=population,
                           population_size=args.population_size,
                           n_mutations=args.n_mutations,
                           gene_size=args.gene_size,
@@ -379,17 +393,15 @@ def main(args):
                           n_jobs=args.n_jobs,
                           random_start=args.random_start,
                           patience=args.patience)
-                          
-
-    if args.molscore in MolScoreBenchmark.presets:
-        scoring_function = MolScoreBenchmark(model_name='smilesGA', output_dir="./", budget=1000, benchmark=args.molscore)
-        for task in scoring_function:
             final_population_smiles = generator.generate_optimized_molecules(scoring_function=task, number_molecules=args.population_size)
+        benchmark.summarize(chemistry_filter_basic=False, diversity_check=False, mols_in_3d=True)
+        
     elif os.path.isdir(args.molscore):
         benchmark = MolScoreBenchmark(model_name='smilesGA', output_dir="./", budget=1000, custom_benchmark=args.molscore)
         for task in benchmark:
             final_population_smiles = generator.generate_optimized_molecules(scoring_function=task, number_molecules=args.population_size)
         benchmark.summarize()
+        
     else:
         ms = MolScore(model_name='smilesGA', task_config=args.molscore)
         final_population_smiles = generator.generate_optimized_molecules(scoring_function=ms.score,
@@ -402,7 +414,9 @@ def main(args):
 def get_args():
     parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser.add_argument('--molscore', type=str, help='Path to MolScore config, or directory of configs, or name of Benchmark')
-    parser.add_argument('--smiles_file', type=str, help='Path to initial SMILES population file')
+    # parser.add_argument('--smiles_file', type=str, help='Path to initial SMILES population file')
+    parser.add_argument('--populations_dir', type=str, required=True, help='Path to directory containing sdf files of the molecules to sample from')
+
 
     # Optional arguments for GA setup
     optional = parser.add_argument_group('Optional')

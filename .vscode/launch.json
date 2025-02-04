@@ -5,6 +5,21 @@
     "version": "0.2.0",
     "configurations": [
         {
+            "name": "Python Debugger: SMILES-GA Sampler with Arguments (3D_Benchmark preset)",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${file}",
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}/SMILES-GA/Inorganic",
+            "args": [
+                "--molscore",
+                "3D_Benchmark",
+                "--populations_dir",
+                "/Users/marcellocostamagna/MolScore/molscore/configs/3D_Benchmark/initial_populations",
+            ],
+            "justMyCode": false
+        },
+        {
             "name": "Python Debugger: Random Sampler with Arguments (3D_Benchmark preset)",
             "type": "debugpy",
             "request": "launch",

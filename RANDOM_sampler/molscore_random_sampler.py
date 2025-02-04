@@ -31,13 +31,12 @@ class RandomSampler:
             A list of sampled molecules.
         """
         selected_molecules = list(np.random.choice(self.molecules, size=number_samples, replace=False))
-        if self.representations == 'SMILES':
-            scores = molscore.score(molecular_inputs=selected_molecules, flt=True, score_only=False)
-            selected_molecules, scores = zip(*sorted(zip(selected_molecules, scores), key=lambda x: x[1], reverse=True))
-        elif self.representations == 'CSD_ENTRY':
+
+        if self.representations == 'CSD_ENTRY':
             #TODO: Implement the CSD_ENTRY representation with CSD Python API
+            # make a list of CCDC_molecule objects from the list of CSD_ENTRYs
             pass
-        elif self.representations == '3D':
+        else:
             scores = molscore.score(molecular_inputs=selected_molecules, flt=True, score_only=False)
             selected_molecules, scores = zip(*sorted(zip(selected_molecules, scores), key=lambda x: x[1], reverse=True))
         # make a dictionary with the molecule and its score

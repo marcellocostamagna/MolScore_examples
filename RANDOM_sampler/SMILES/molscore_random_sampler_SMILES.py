@@ -47,7 +47,6 @@ def get_population(population_file):
 
 def main(args):
     # Get populations files from the directory in order (The will have names population_1, population_2, etc)
-    # Get only the ones that exist
     populations = [os.path.join(args.populations_dir, f'population_{i}.sdf') for i in range(1, 100) if os.path.exists(os.path.join(args.populations_dir, f'population_{i}.sdf'))]
 
     # Use MolScore to compute the scores for the selected SMILES
