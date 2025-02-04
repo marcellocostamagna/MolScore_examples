@@ -4,7 +4,70 @@
     // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
     "version": "0.2.0",
     "configurations": [
-        
+        {
+            "name": "Python Debugger: Random Sampler with Arguments (3D_Benchmark preset)",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${file}",
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}/RANDOM_sampler/3D/Organic",
+            "args": [
+                "--molscore",
+                "3D_Benchmark",
+                "--populations_dir",
+                "/Users/marcellocostamagna/MolScore/molscore/configs/3D_Benchmark/initial_populations",
+                "--population_size",
+                "100",
+            ],
+            "justMyCode": false
+        },
+        {
+            "name": "Python Debugger: Random Sampler with Arguments (Benchmark Test with 3D organic molecules)",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${file}",
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}/RANDOM_sampler/3D/Organic",
+            "args": [
+                "--molscore",
+                "/Users/marcellocostamagna/MolScore/molscore/configs/Test_benchmark",
+                "--populations_dir",
+                "/Users/marcellocostamagna/MolScore/molscore/configs/Test_benchmark/initial_populations",
+                "--population_size",
+                "100",
+            ],
+            "justMyCode": false
+        },
+        {
+            "name": "Python Debugger: SMILES-GA with Arguments (Benchmark Test with organic SMILES)",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${file}",
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}/SMILES-GA/Inorganic",
+            "args": [
+                "--molscore",
+                "test_benchmark",
+                "--smiles_file",
+                "ZINC_first_1000.smi",
+            ],
+            "justMyCode": false
+        },
+        {
+            "name": "Python Debugger: GRAPH-GA File with Arguments (Guacamol)",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${file}",
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}/GraphGA",
+            "args": [
+                "--molscore",
+                "GuacaMol",
+                "--smiles_file",
+                "ZINC_first_1000.smi",
+            ],
+            "justMyCode": false
+        },
         {
             "name": "Python Debugger: SMILES-GA with Arguments (Inorganic)",
             "type": "debugpy",
@@ -16,7 +79,7 @@
                 "--molscore",
                 "hsr_test.json",
                 "--smiles_file",
-                "smiles_Ru_100.txt",
+                "smiles_0_3.txt",
             ],
             "justMyCode": false
         },
