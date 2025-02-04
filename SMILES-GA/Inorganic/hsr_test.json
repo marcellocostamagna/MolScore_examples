@@ -1,6 +1,6 @@
 {
     "task": "hsr_test",
-    "output_dir": "./output_smiles_0_6_2/",
+    "output_dir": "./output_smiles_0_6_1/",
     "load_from_previous": false,
     "logging": true,
     "monitor_app": false,
@@ -12,8 +12,8 @@
             "parameters": {
                 "prefix": "hsrP",
                 "ref_molecule": "/Users/marcellocostamagna/MolScore/MolScore_examples/SMILES-GA/Inorganic/target.sdf",
-                "generator": "ccdc",
-                "n_jobs": 4
+                "generator": "obabel",
+                "n_jobs": 6
             }
         }
     ],

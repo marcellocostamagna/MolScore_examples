@@ -3,7 +3,7 @@
   "output_dir": "./",
   "load_from_previous": false,
   "logging": false,
-  "monitor_app": false,
+  "monitor_app": true,
   "termination_exit": false,
   "scoring_functions": [
     {

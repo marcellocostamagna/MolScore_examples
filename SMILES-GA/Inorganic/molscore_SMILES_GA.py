@@ -26,8 +26,13 @@ import copy
 from molscore.utils.smiles_grammar import GCFG
 from collections import namedtuple
 from molscore.utils.cfg_util import encode, decode
-from ccdc.molecule import Molecule as CCDCMolecule
-from ccdc import search
+
+# try:
+#     from ccdc.molecule import Molecule as CCDCMolecule
+#     from ccdc import search
+# except Exception as ccdc_exception:
+#     print(f"Error importing CCDC: {ccdc_exception}")
+    
 import signal
 
 Molecule = namedtuple('Molecule', ['score', 'smiles', 'gene'])
@@ -122,38 +127,38 @@ def remove_duplicates(population):
         unique_smiles.add(smiles)
     return unique_population
 
-def get_csd_fingerprint(molecule):
-    sim_search = search.SimilaritySearch(molecule)
-    fp_builder = sim_search._fp
-    fp = fp_builder.similarity_fingerprint(molecule._molecule)
-    return fp
+# def get_csd_fingerprint(molecule):
+#     sim_search = search.SimilaritySearch(molecule)
+#     fp_builder = sim_search._fp
+#     fp = fp_builder.similarity_fingerprint(molecule._molecule)
+#     return fp
     
-def topological_similarity(smiles1, smiles2):
-    query = CCDCMolecule.from_string(smiles1)
-    target = CCDCMolecule.from_string(smiles2)
-    query_fp = get_csd_fingerprint(query)
-    target_fp = get_csd_fingerprint(target)
-    similarity = query_fp.tanimoto(target_fp)
-    return similarity
+# def topological_similarity(smiles1, smiles2):
+#     query = CCDCMolecule.from_string(smiles1)
+#     target = CCDCMolecule.from_string(smiles2)
+#     query_fp = get_csd_fingerprint(query)
+#     target_fp = get_csd_fingerprint(target)
+#     similarity = query_fp.tanimoto(target_fp)
+#     return similarity
     
-def diversity_check(candidate_smiles, candidate_score, population, score_threshold=0.001, similarity_threshold=0.99):
-    """
-    Checks whether a candidate molecule satisfies diversity constraints with respect to the current population.
-    A candidate molecule is considered acceptable if:
-    1. Its score is sufficiently different from the scores of the molecules in the population.
-    2. Its topological similarity to the molecules in the population is below a certain threshold.
+# def diversity_check(candidate_smiles, candidate_score, population, score_threshold=0.001, similarity_threshold=0.99):
+#     """
+#     Checks whether a candidate molecule satisfies diversity constraints with respect to the current population.
+#     A candidate molecule is considered acceptable if:
+#     1. Its score is sufficiently different from the scores of the molecules in the population.
+#     2. Its topological similarity to the molecules in the population is below a certain threshold.
 
-    """
-    for molecule in population:
-        # Check if the score difference is below the threshold
-        if abs(candidate_score - molecule.score) <= score_threshold:
-            # Compute topological similarity
-            similarity = topological_similarity(candidate_smiles, molecule.smiles)
-            if similarity >= similarity_threshold:
-                # Too similar in both score and topology
-                return False
-    # Passed all checks
-    return True
+#     """
+#     for molecule in population:
+#         # Check if the score difference is below the threshold
+#         if abs(candidate_score - molecule.score) <= score_threshold:
+#             # Compute topological similarity
+#             similarity = topological_similarity(candidate_smiles, molecule.smiles)
+#             if similarity >= similarity_threshold:
+#                 # Too similar in both score and topology
+#                 return False
+#     # Passed all checks
+#     return True
     
 def robust_mutation(original_smiles, original_gene, max_attempts=10):
     while max_attempts > 0:
@@ -172,10 +177,11 @@ def robust_mutation(original_smiles, original_gene, max_attempts=10):
                 continue  
             # Step 5: Check if a valid Molecule object can be generated
             # We consider a molecule valid if it can be instantiated as a CCDCMolecule
-            molecule = CCDCMolecule.from_string(c_smiles)
-            if molecule is None:
-                max_attempts -= 1
-                continue 
+            #TODO: remove comment if CCDC is available
+            # molecule = CCDCMolecule.from_string(c_smiles)
+            # if molecule is None:
+            #     max_attempts -= 1
+            #     continue 
             # If all checks pass, return the new SMILES and gene
             return c_smiles, c_gene
         except Exception as e:
@@ -233,7 +239,6 @@ class SMILES_GA:
             initial_genes = pool.map(smiles_to_gene_partial, starting_population)
             
         # Insert SMILES and respective genes in the cache
-        # The score field will be empty (None) for now
         for smiles, gene in zip(starting_population, initial_genes):
             if smiles not in score_cache and gene is not None:
                 score_cache[smiles] = {"score": None, "gene": gene}  
@@ -281,30 +286,38 @@ class SMILES_GA:
             # EVOLVE/MUTATE GENES
             print(f'Mutating genes...')
             # 1- Generation of children: mutation of genes
+            start_mutations = time()
             n_processes = min(self.n_jobs, len(smiles_to_mutate), os.cpu_count())
             with multiprocessing.Pool(self.n_jobs) as pool:
                 mutated_results = pool.starmap(robust_mutation, zip(smiles_to_mutate, genes_to_mutate))
+            end_mutations = time()
                     
             # 2- Collect candidates to score (remove SMILES that are already in the cache)
+            start_collect = time()
             candidates_to_score = []
             candidates_genes = []
             for c_smiles, c_gene in mutated_results:
                 if c_smiles is not None and c_smiles not in score_cache:
                     candidates_to_score.append(c_smiles)
                     candidates_genes.append(c_gene)
+            end_collect = time()
             
-            # 3- Score the candidates         
+            # 3- Score the candidates      
+            start_scoring = time()   
             print(f'Scoring mutated genes...\n')
             # Score the SMILES that have not been scored yet         
-            new_scores = scoring_function(candidates_to_score, flt=True, score_only=True)
+            new_scores = scoring_function(candidates_to_score, flt=True) #, score_only=True)
+            end_scoring = time()
             
             # 4- Update cache with new scores
-            
-            for candidate_smiles, candidate_gene, candidate_score in zip(candidates_to_score, candidates_genes, new_scores):
-                if diversity_check(candidate_smiles, candidate_score, population):
-                    score_cache[candidate_smiles] = {"score": candidate_score, "gene": candidate_gene}
+            start_update = time()
+            # for candidate_smiles, candidate_gene, candidate_score in zip(candidates_to_score, candidates_genes, new_scores):
+            #     if diversity_check(candidate_smiles, candidate_score, population):
+            #         score_cache[candidate_smiles] = {"score": candidate_score, "gene": candidate_gene}
+            end_update = time()
                 
             # 5- Selection: survival of the fittest
+            start_selection = time()
             # Create population from cache
             population = [
                 Molecule(entry["score"], smiles, entry["gene"]) 
@@ -312,6 +325,7 @@ class SMILES_GA:
             ]
             # Select the top `population_size` based on the scores
             population = sorted(population, key=lambda x: x.score, reverse=True)[:self.population_size]
+            end_selection = time()
 
             # Stats
             gen_time = time() - t0
@@ -340,9 +354,17 @@ class SMILES_GA:
                   f'{gen_time:.2f} sec/gen | '
                   f'{mol_sec:.2f} mol/sec\n')
             
-            with open(os.path.join(output_dir, f'population_{generation}.smi'), 'w') as f:
-                for smi, score in population_smiles:
-                    f.write(f'{smi}\t{score}\n')
+            # for debugging purposes print the time taken for each step
+            print(f'Time taken for generation: {gen_time:.2f} seconds')
+            print(f'1- Mutations: {end_mutations - start_mutations:.2f} seconds')
+            print(f'2- Collection of candidates: {end_collect - start_collect:.2f} seconds')
+            print(f'3- Scoring of candidates: {end_scoring - start_scoring:.2f} seconds')
+            print(f'4- Update of cache: {end_update - start_update:.2f} seconds')
+            print(f'5- Selection of population: {end_selection - start_selection:.2f} seconds')
+            
+            # with open(os.path.join(output_dir, f'population_{generation}.smi'), 'w') as f:
+            #     for smi, score in population_smiles:
+            #         f.write(f'{smi}\t{score}\n')
 
         # Return final population
         return [(molecule.smiles, molecule.score) for molecule in population]
@@ -364,18 +386,15 @@ def main(args):
         for task in scoring_function:
             final_population_smiles = generator.generate_optimized_molecules(scoring_function=task, number_molecules=args.population_size)
     elif os.path.isdir(args.molscore):
-        scoring_function = MolScoreBenchmark(model_name='smilesGA', output_dir="./", budget=1000, custom_benchmark=args.molscore)
-        for task in scoring_function:
+        benchmark = MolScoreBenchmark(model_name='smilesGA', output_dir="./", budget=1000, custom_benchmark=args.molscore)
+        for task in benchmark:
             final_population_smiles = generator.generate_optimized_molecules(scoring_function=task, number_molecules=args.population_size)
+        benchmark.summarize()
     else:
         ms = MolScore(model_name='smilesGA', task_config=args.molscore)
         final_population_smiles = generator.generate_optimized_molecules(scoring_function=ms.score,
                                                                          number_molecules=args.population_size,
                                                                          output_dir=ms.save_dir)
-
-    with open(os.path.join(ms.save_dir, 'final_population.smi'), 'w') as f:
-        for smi, score in final_population_smiles:
-            f.write(f'{smi}\t{score}\n')
             
     return True
 
@@ -391,7 +410,7 @@ def get_args():
     optional.add_argument('--population_size', type=int, default=100, help='Population size')
     optional.add_argument('--n_mutations', type=int, default=50, help='Number of mutations per generation')
     optional.add_argument('--gene_size', type=int, default=-1, help='Gene size for the CFG-based encoding')
-    optional.add_argument('--generations', type=int, default=1000, help='Number of generations')
+    optional.add_argument('--generations', type=int, default=3, help='Number of generations')
     optional.add_argument('--n_jobs', type=int, default=8, help='Number of parallel jobs')
     optional.add_argument('--random_start', action='store_true', help='Start with a random population')
     optional.add_argument('--patience', type=int, default=5, help='Early stopping patience')
