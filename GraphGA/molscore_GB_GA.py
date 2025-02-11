@@ -214,9 +214,11 @@ def main(args):
     
         # Use MolScore scoring function (not budget doesn't do anything in this case, aside from limiting analysis afterwords)
     if (args.molscore in MolScoreBenchmark.presets):
-        scoring_function = MolScoreBenchmark(model_name='graphGA', output_dir="./", budget=1000, benchmark=args.molscore)
+        scoring_function = MolScoreBenchmark(model_name='graphGA', output_dir="./", include=['Zaleplon_MPO', 'Aripiprazole_similarity'], budget=1000, benchmark=args.molscore)
         for task in scoring_function:
             final_population_smiles = generator.generate_optimized_molecules(scoring_function=task)
+        
+        scoring_function.summarize(chemistry_filter_basic=False, n_jobs=1)
     
     elif os.path.isdir(args.molscore):
         scoring_function = MolScoreBenchmark(model_name='graphGA', output_dir="./", budget=1000, custom_benchmark=args.molscore)
@@ -227,8 +229,8 @@ def main(args):
         ms = MolScore(model_name='graphGA', task_config=args.molscore)
         final_population_smiles = generator.generate_optimized_molecules(scoring_function=ms.score)
 
-    with open(os.path.join(scoring_function.save_dir, 'final_population.smi'), 'w') as f:
-        [f.write(smi + '\n') for smi in final_population_smiles]
+    # with open(os.path.join(scoring_function.save_dir, 'final_population.smi'), 'w') as f:
+    #     [f.write(smi + '\n') for smi in final_population_smiles]
     return
  
 
@@ -240,9 +242,9 @@ def get_args():
     optional = parser.add_argument_group('Optional')
     optional.add_argument('--seed', type=int, default=0, help=' ')
     optional.add_argument('--population_size', type=int, default=20, help=' ')
-    optional.add_argument('--offspring_size', type=int, default=10, help=' ')
+    optional.add_argument('--offspring_size', type=int, default=20, help=' ')
     optional.add_argument('--mutation_rate', type=float, default=0.01, help=' ')
-    optional.add_argument('--generations', type=int, default=20, help=' ')
+    optional.add_argument('--generations', type=int, default=100, help=' ')
     optional.add_argument('--n_jobs', type=int, default=-1, help=' ')
     optional.add_argument('--random_start', action='store_true')
     optional.add_argument('--patience', type=int, default=5, help=' ')
