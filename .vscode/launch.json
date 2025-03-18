@@ -4,6 +4,18 @@
     // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
     "version": "0.2.0",
     "configurations": [
+        
+
+
+        {
+            "name": "Python Debugger: Random Sampler for 3D Benchmark",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${file}",
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}/RANDOM_sampler/",
+            "justMyCode": false
+        },
         {
             "name": "Python Debugger: SMILES-GA Sampler with Arguments (3D_Benchmark preset)",
             "type": "debugpy",
@@ -15,7 +27,7 @@
                 "--molscore",
                 "3D_Benchmark",
                 "--populations_dir",
-                "/Users/marcellocostamagna/MolScore/molscore/configs/3D_Benchmark/initial_populations",
+                "/Home/siv33/mco032/MolScore/molscore/configs/3D_Benchmark/initial_populations",
             ],
             "justMyCode": false
         },
@@ -25,12 +37,12 @@
             "request": "launch",
             "program": "${file}",
             "console": "integratedTerminal",
-            "cwd": "${workspaceFolder}/RANDOM_sampler/3D/Organic",
+            "cwd": "${workspaceFolder}/RANDOM_sampler/3D",
             "args": [
                 "--molscore",
                 "3D_Benchmark",
                 "--populations_dir",
-                "/Users/marcellocostamagna/MolScore/molscore/configs/3D_Benchmark/initial_populations",
+                "/Home/siv33/mco032/MolScore/molscore/configs/3D_Benchmark/initial_populations",
                 "--population_size",
                 "100",
             ],

@@ -23,15 +23,18 @@ from molscore.manager import MolScore, MolScoreBenchmark
 from molscore.scoring_functions.utils import timedFunc2
 import nltk
 import copy
-from molscore.utils.smiles_grammar import GCFG
 from collections import namedtuple
-from molscore.utils.cfg_util import encode, decode
+from cfg_util import encode, decode
+from smiles_grammars import GCFG_INORG, GCFG_ORG
 
-# try:
-#     from ccdc.molecule import Molecule as CCDCMolecule
-#     from ccdc import search
-# except Exception as ccdc_exception:
-#     print(f"Error importing CCDC: {ccdc_exception}")
+
+from cfg_util import encode, decode
+
+try:
+    from ccdc.molecule import Molecule as CCDCMolecule
+    from ccdc import search
+except Exception as ccdc_exception:
+    print(f"Error importing CCDC: {ccdc_exception}")
     
 import signal
 
@@ -47,11 +50,11 @@ def timeout_handler(signum, frame):
 # Set the signal handler for alarm
 signal.signal(signal.SIGALRM, timeout_handler)
 
-def cfg_to_gene(prod_rules, max_len=-1):
+def cfg_to_gene(prod_rules, grammar, max_len=-1):
     gene = []
     for r in prod_rules:
-        lhs = GCFG.productions()[r].lhs()
-        possible_rules = [idx for idx, rule in enumerate(GCFG.productions())
+        lhs = grammar.productions()[r].lhs()
+        possible_rules = [idx for idx, rule in enumerate(grammar.productions())
                           if rule.lhs() == lhs]
         gene.append(possible_rules.index(r))
     if max_len > 0:
@@ -63,20 +66,20 @@ def cfg_to_gene(prod_rules, max_len=-1):
     return gene
 
 
-def gene_to_cfg(gene):
+def gene_to_cfg(gene, grammar):
     prod_rules = []
-    stack = [GCFG.productions()[0].lhs()]
+    stack = [grammar.productions()[0].lhs()]
     for g in gene:
         try:
             lhs = stack.pop()
         except Exception:
             break
-        possible_rules = [idx for idx, rule in enumerate(GCFG.productions())
+        possible_rules = [idx for idx, rule in enumerate(grammar.productions())
                           if rule.lhs() == lhs]
         rule = possible_rules[g % len(possible_rules)]
         prod_rules.append(rule)
         rhs = filter(lambda a: (type(a) == nltk.grammar.Nonterminal) and (str(a) != 'None'),
-                     GCFG.productions()[rule].rhs())
+                     grammar.productions()[rule].rhs())
         stack.extend(list(rhs)[::-1])
     return prod_rules
 
@@ -127,38 +130,38 @@ def remove_duplicates(population):
         unique_smiles.add(smiles)
     return unique_population
 
-# def get_csd_fingerprint(molecule):
-#     sim_search = search.SimilaritySearch(molecule)
-#     fp_builder = sim_search._fp
-#     fp = fp_builder.similarity_fingerprint(molecule._molecule)
-#     return fp
+def get_csd_fingerprint(molecule):
+    sim_search = search.SimilaritySearch(molecule)
+    fp_builder = sim_search._fp
+    fp = fp_builder.similarity_fingerprint(molecule._molecule)
+    return fp
     
-# def topological_similarity(smiles1, smiles2):
-#     query = CCDCMolecule.from_string(smiles1)
-#     target = CCDCMolecule.from_string(smiles2)
-#     query_fp = get_csd_fingerprint(query)
-#     target_fp = get_csd_fingerprint(target)
-#     similarity = query_fp.tanimoto(target_fp)
-#     return similarity
+def topological_similarity(smiles1, smiles2):
+    query = CCDCMolecule.from_string(smiles1)
+    target = CCDCMolecule.from_string(smiles2)
+    query_fp = get_csd_fingerprint(query)
+    target_fp = get_csd_fingerprint(target)
+    similarity = query_fp.tanimoto(target_fp)
+    return similarity
     
-# def diversity_check(candidate_smiles, candidate_score, population, score_threshold=0.001, similarity_threshold=0.99):
-#     """
-#     Checks whether a candidate molecule satisfies diversity constraints with respect to the current population.
-#     A candidate molecule is considered acceptable if:
-#     1. Its score is sufficiently different from the scores of the molecules in the population.
-#     2. Its topological similarity to the molecules in the population is below a certain threshold.
+def diversity_check(candidate_smiles, candidate_score, population, score_threshold=0.001, similarity_threshold=0.99):
+    """
+    Checks whether a candidate molecule satisfies diversity constraints with respect to the current population.
+    A candidate molecule is considered acceptable if:
+    1. Its score is sufficiently different from the scores of the molecules in the population.
+    2. Its topological similarity to the molecules in the population is below a certain threshold.
 
-#     """
-#     for molecule in population:
-#         # Check if the score difference is below the threshold
-#         if abs(candidate_score - molecule.score) <= score_threshold:
-#             # Compute topological similarity
-#             similarity = topological_similarity(candidate_smiles, molecule.smiles)
-#             if similarity >= similarity_threshold:
-#                 # Too similar in both score and topology
-#                 return False
-#     # Passed all checks
-#     return True
+    """
+    for molecule in population:
+        # Check if the score difference is below the threshold
+        if abs(candidate_score - molecule.score) <= score_threshold:
+            # Compute topological similarity
+            similarity = topological_similarity(candidate_smiles, molecule.smiles)
+            if similarity >= similarity_threshold:
+                # Too similar in both score and topology
+                return False
+    # Passed all checks
+    return True
     
 def robust_mutation(original_smiles, original_gene, max_attempts=10):
     while max_attempts > 0:
@@ -178,10 +181,10 @@ def robust_mutation(original_smiles, original_gene, max_attempts=10):
             # Step 5: Check if a valid Molecule object can be generated
             # We consider a molecule valid if it can be instantiated as a CCDCMolecule
             #TODO: remove comment if CCDC is available
-            # molecule = CCDCMolecule.from_string(c_smiles)
-            # if molecule is None:
-            #     max_attempts -= 1
-            #     continue 
+            molecule = CCDCMolecule.from_string(c_smiles)
+            if molecule is None:
+                max_attempts -= 1
+                continue 
             # If all checks pass, return the new SMILES and gene
             return c_smiles, c_gene
         except Exception as e:
@@ -306,7 +309,7 @@ class SMILES_GA:
             start_scoring = time()   
             print(f'Scoring mutated genes...\n')
             # Score the SMILES that have not been scored yet         
-            new_scores = scoring_function(candidates_to_score, flt=True) #, score_only=True)
+            new_scores = scoring_function(candidates_to_score, flt=True, save_files=True) #, score_only=True)
             end_scoring = time()
             
             # 4- Update cache with new scores
@@ -378,7 +381,7 @@ def get_population(population_file):
 def main(args):
     
     # Get populations files from the directory in order (The will have names population_1, population_2, etc)
-    populations = [os.path.join(args.populations_dir, f'population_{i}.smi') for i in range(1, 100) if os.path.exists(os.path.join(args.populations_dir, f'population_{i}.sdf'))]    
+    populations = [os.path.join(args.populations_dir, f'population_{i}.smi') for i in range(1, 100) if os.path.exists(os.path.join(args.populations_dir, f'population_{i}.smi'))]    
     
     if args.molscore in MolScoreBenchmark.presets:
         benchmark = MolScoreBenchmark(model_name='smilesGA', output_dir="./", budget=1000, benchmark=args.molscore)
@@ -424,7 +427,7 @@ def get_args():
     optional.add_argument('--population_size', type=int, default=100, help='Population size')
     optional.add_argument('--n_mutations', type=int, default=50, help='Number of mutations per generation')
     optional.add_argument('--gene_size', type=int, default=-1, help='Gene size for the CFG-based encoding')
-    optional.add_argument('--generations', type=int, default=3, help='Number of generations')
+    optional.add_argument('--generations', type=int, default=10, help='Number of generations')
     optional.add_argument('--n_jobs', type=int, default=8, help='Number of parallel jobs')
     optional.add_argument('--random_start', action='store_true', help='Start with a random population')
     optional.add_argument('--patience', type=int, default=5, help='Early stopping patience')

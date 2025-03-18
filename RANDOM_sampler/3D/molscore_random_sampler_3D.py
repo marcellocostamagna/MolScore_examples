@@ -5,6 +5,7 @@ from typing import List
 from molscore.manager import MolScore, MolScoreBenchmark
 from openbabel import pybel as pb
 from rdkit import Chem
+import time 
 
 class RandomSampler:
     """
@@ -79,6 +80,7 @@ def get_args():
     return parser.parse_args()
 
 if __name__ == "__main__":
-    
+    start = time.time()
     args = get_args()
     main(args)
+    print(f'Time elapsed: {time.time() - start}')
